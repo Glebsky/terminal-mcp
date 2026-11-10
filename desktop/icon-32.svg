@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34508C"/>
+      <stop offset="1" stop-color="#0E1739"/>
+    </linearGradient>
+    <linearGradient id="planet" gradientUnits="userSpaceOnUse" x1="0" y1="25.5" x2="0" y2="32">
+      <stop offset="0" stop-color="#2F6FE6"/>
+      <stop offset="1" stop-color="#142F78"/>
+    </linearGradient>
+    <linearGradient id="air" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#A498FF" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#ADF3F4"/>
+      <stop offset="1" stop-color="#A498FF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8A9AFF"/>
+      <stop offset="1" stop-color="#4053D4"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F5F8FF"/>
+      <stop offset="1" stop-color="#B4C0D4"/>
+    </linearGradient>
+    <clipPath id="plate">
+      <rect width="32" height="32" rx="7.5"/>
+    </clipPath>
+  </defs>
+  <rect width="32" height="32" rx="7.5" fill="url(#bg)"/>
+  <g clip-path="url(#plate)">
+    <circle cx="16" cy="48" r="22.5" fill="url(#planet)"/>
+    <circle cx="16" cy="48" r="22.5" fill="none" stroke="url(#air)" stroke-opacity=".35" stroke-width="3"/>
+    <circle cx="16" cy="48" r="22.5" fill="none" stroke="url(#air)" stroke-width="1"/>
+  </g>
+  <rect x=".5" y=".5" width="31" height="31" rx="7" fill="none" stroke="#A3D9F0" stroke-opacity=".45"/>
+  <path d="M16 9V5.6" stroke="#C9D4E6" stroke-width="1.2" stroke-linecap="round"/>
+  <circle cx="16" cy="4.6" r="1.5" fill="#FFB48C"/>
+  <rect x="2" y="15" width="28" height="2" rx=".5" fill="#B8C5DA"/>
+  <g fill="url(#panel)" stroke="#DCE3FF" stroke-width=".8">
+    <rect x="2.4" y="8.4" width="6.2" height="5.2" rx=".8"/>
+    <rect x="2.4" y="18.4" width="6.2" height="5.2" rx=".8"/>
+    <rect x="23.4" y="8.4" width="6.2" height="5.2" rx=".8"/>
+    <rect x="23.4" y="18.4" width="6.2" height="5.2" rx=".8"/>
+  </g>
+  <rect x="9.5" y="9" width="13" height="14" rx="3" fill="url(#metal)"/>
+  <rect x="11" y="11" width="10" height="10.5" rx="1.6" fill="#0A1430"/>
+  <path d="M13.2 13.8l2.4 2.4-2.4 2.4M16.9 19.2h2.4" fill="none" stroke="#B4FFF2" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

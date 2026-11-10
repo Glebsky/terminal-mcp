@@ -14,7 +14,11 @@ const isDev = !app.isPackaged && (process.env.NODE_ENV === "development" || !!pr
 const projectRoot = path.resolve(__dirname, "../..");
 const pngIconPath = path.join(projectRoot, "desktop", "icon.png");
 const svgIconPath = path.join(projectRoot, "desktop", "icon.svg");
-const appIconPath = fs.existsSync(pngIconPath) ? pngIconPath : svgIconPath;
+const icoIconPath = path.join(projectRoot, "desktop", "icon.ico");
+// Windows gets the .ico: it carries hand-tuned 16-40 px artwork for the window, taskbar and tray.
+const appIconPath = process.platform === "win32" && fs.existsSync(icoIconPath)
+  ? icoIconPath
+  : fs.existsSync(pngIconPath) ? pngIconPath : svgIconPath;
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -215,7 +219,7 @@ function updateTrayMenu(status?: ServerStatus) {
 function createTray() {
   if (tray) return;
 
-  const trayIcon = nativeImage.createFromPath(fs.existsSync(pngIconPath) ? pngIconPath : appIconPath);
+  const trayIcon = nativeImage.createFromPath(appIconPath);
   tray = new Tray(trayIcon);
 
   tray.on("click", () => {

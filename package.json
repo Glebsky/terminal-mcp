@@ -10,6 +10,7 @@
     "build:electron": "tsc -p tsconfig.electron.json",
     "build:renderer": "vite build",
     "build": "npm run build:server && npm run build:electron && npm run build:renderer",
+    "icons": "electron desktop/build-icons.cjs",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "app:dev": "concurrently -k -n \"vite,electron\" -c \"cyan,magenta\" \"vite\" \"electron .\"",

@@ -1,6 +1,6 @@
 import React from "react";
 import { Minus, Square, X, Shield, Globe, ArrowDownToLine } from "lucide-react";
-import stationIcon from "../../../icon.svg";
+import stationIcon from "../../../icon-32.svg";
 import { tunnelProviderLabels, type ServerStatus } from "../../types";
 
 

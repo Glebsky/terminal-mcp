@@ -8,6 +8,7 @@ files:
   - dist-renderer/**/*
   - desktop/icon.svg
   - desktop/icon.png
+  - desktop/icon.ico
   - package.json
 # Reuse the matching Electron already installed by npm instead of downloading it again.
 # This project packages Windows x64, matching the local Electron installation.
@@ -24,7 +25,7 @@ win:
     - target: nsis
       arch:
         - x64
-  icon: desktop/icon.svg
+  icon: desktop/icon.ico
   signExecutable: false
   signExts:
     - "!.exe"
