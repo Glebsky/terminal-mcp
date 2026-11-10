@@ -55,7 +55,7 @@
     "concurrently": "^10.0.5",
     "electron": "^45.2.3",
     "electron-builder": "^26.15.3",
-    "lucide-react": "^1.55.0",
+    "lucide-react": "^1.70.0",
     "react": "^19.2.8",
     "react-dom": "^19.3.0",
     "tailwind-merge": "^3.7.0",
