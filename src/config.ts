@@ -25,9 +25,17 @@ const HOST = process.env.HOST || "127.0.0.1";
 const API_KEY = process.env.MCP_API_KEY || "";
 const FULL_ACCESS = booleanEnv("FULL_ACCESS", false);
 const FILES_ROOT = path.resolve(process.env.FILES_ROOT || path.join(process.cwd(), "workspace"));
-const COMMAND_TIMEOUT_MS = integerEnv("COMMAND_TIMEOUT_MS", 120_000);
+const COMMAND_TIMEOUT_MS = Math.min(integerEnv("COMMAND_TIMEOUT_MS", 120_000), 900_000);
 const MAX_OUTPUT_BYTES = integerEnv("MAX_OUTPUT_BYTES", 1_048_576);
 const MAX_FILE_BYTES = integerEnv("MAX_FILE_BYTES", 10_485_760);
+const MAX_SSE_SESSIONS = integerEnv("MAX_SSE_SESSIONS", 32);
+// Tool names hidden from agents, separated by semicolons/commas/spaces (e.g. "terminal_execute;file_delete").
+const DISABLED_TOOLS: ReadonlySet<string> = new Set(
+  (process.env.DISABLED_TOOLS || "")
+    .split(/[;,\s]+/)
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean),
+);
 
 const requestedProvider = (process.env.TUNNEL_PROVIDER || "").trim().toLowerCase();
 if (requestedProvider && !["none", "ngrok", "tuna", "cloudflare", "localtunnel"].includes(requestedProvider)) throw new Error("Unsupported TUNNEL_PROVIDER. Choose none, ngrok, tuna, cloudflare or localtunnel.");
@@ -65,6 +73,8 @@ export const config = {
   commandTimeoutMs: COMMAND_TIMEOUT_MS,
   maxOutputBytes: MAX_OUTPUT_BYTES,
   maxFileBytes: MAX_FILE_BYTES,
+  maxSseSessions: MAX_SSE_SESSIONS,
+  disabledTools: DISABLED_TOOLS,
   allowedHosts: ALLOWED_HOSTS,
   tunnelProvider: TUNNEL_PROVIDER,
   tuna: { executable: (process.env.TUNA_EXECUTABLE || "tuna").trim(), apiKey: (process.env.TUNA_API_KEY || "").trim(), subdomain: (process.env.TUNA_SUBDOMAIN || "").trim() },

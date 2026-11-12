@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import express, { type Express } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -8,6 +9,19 @@ import { validateHost } from "./middleware/host.js";
 import { registerAllTools } from "./tools/index.js";
 import { monitorRequest, recordRequestBody, setSseCountProvider } from "./monitor.js";
 
+const SERVER_NAME = "notion-terminal-files";
+const SERVER_VERSION: string = (() => {
+  try {
+    const pkg = createRequire(import.meta.url)("../package.json") as { version?: unknown };
+    return typeof pkg.version === "string" ? pkg.version : "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+})();
+
+// JSON-RPC bodies must fit file_write payloads (base64 adds ~33%) plus envelope overhead.
+const JSON_BODY_LIMIT = Math.max(2 * 1024 * 1024, Math.ceil((config.maxFileBytes * 4) / 3) + 256 * 1024);
+
 // Active SSE sessions for standard MCP SSE transport (/sse + /messages)
 const sseSessions = new Map<string, { transport: SSEServerTransport; server: McpServer }>();
 setSseCountProvider(() => sseSessions.size);
@@ -17,8 +31,8 @@ const activeStreamableTransports = new Set<StreamableHTTPServerTransport>();
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({
-    name: "notion-terminal-files",
-    version: "1.0.0",
+    name: SERVER_NAME,
+    version: SERVER_VERSION,
   });
 
   registerAllTools(server);
@@ -29,7 +43,7 @@ export function createApp(): Express {
   const app = express();
 
   app.disable("x-powered-by");
-  app.use(express.json({ limit: "2mb", verify: (req, _res, buf) => recordRequestBody(req as import("express").Request, buf) }));
+  app.use(express.json({ limit: JSON_BODY_LIMIT, verify: (req, _res, buf) => recordRequestBody(req as import("express").Request, buf) }));
 
   // Keep-alive settings to prevent hanging connections
   app.use((_req, res, next) => {
@@ -39,7 +53,8 @@ export function createApp(): Express {
   });
 
   // Root endpoint info
-  app.get("/", (_req, res) => {
+  // Public endpoints expose no runtime details (access mode, session counts).
+  app.get("/", validateHost, (_req, res) => {
     res.json({
       name: "MCP Terminal Server",
       status: "running",
@@ -52,19 +67,15 @@ export function createApp(): Express {
       },
       auth_required: true,
       auth_type: "Bearer Token",
-      active_sse_sessions: sseSessions.size,
-      active_streamable_connections: activeStreamableTransports.size,
     });
   });
 
   // Health check endpoint
-  app.get("/health", (_req, res) => {
+  app.get("/health", validateHost, (_req, res) => {
     res.json({
       status: "ok",
-      server: "notion-terminal-files",
-      full_access: config.fullAccess,
-      active_sse_sessions: sseSessions.size,
-      active_streamable_connections: activeStreamableTransports.size,
+      server: SERVER_NAME,
+      version: SERVER_VERSION,
     });
   });
 
@@ -102,6 +113,11 @@ export function createApp(): Express {
   // For clients (like older Notion integrations or Cursor) that use the standard
   // SSE handshake: GET /sse -> sends endpoint event -> client POSTs to /messages?sessionId=...
   app.get("/sse", validateHost, authenticate, monitorRequest, async (req, res) => {
+    if (sseSessions.size >= config.maxSseSessions) {
+      res.status(503).json({ error: "Too many active SSE sessions" });
+      return;
+    }
+
     const server = createMcpServer();
     const transport = new SSEServerTransport("/messages", res);
     const sessionId = transport.sessionId;

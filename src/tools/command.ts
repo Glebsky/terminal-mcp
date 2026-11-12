@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
+import * as fsSync from "node:fs";
+import * as path from "node:path";
 import { config } from "../config.js";
 import { auditLog } from "../utils/logger.js";
+import { scrubbedEnv } from "../utils/env.js";
 import { resolveTarget, getActiveWorkingDir, setActiveWorkingDir } from "./filesystem.js";
 
 export interface CommandExecutionResult {
@@ -29,29 +32,33 @@ export async function killProcessTree(childPid: number): Promise<void> {
   }
 }
 
+// A command that consists only of `cd <dir>` / `Set-Location <dir>`.
+const CD_COMMAND = /^\s*(?:cd|chdir|Set-Location|sl)\s+['"]?([^'";\n\r&|]+?)['"]?\s*$/i;
+
+/**
+ * Runs a shell command with the privileges of the account running the server.
+ * FILES_ROOT / FULL_ACCESS only restrict the starting working directory;
+ * they do NOT restrict what the command itself can access.
+ */
 export async function executeCommand(
   command: string,
   shell: "powershell" | "cmd" = "powershell",
   cwd?: string,
   timeoutMs?: number,
 ): Promise<CommandExecutionResult> {
-  const actualCwd = cwd
-    ? resolveTarget(cwd)
-    : getActiveWorkingDir();
-
+  // `cwd` applies to this call only and does not change the shared working directory.
+  const actualCwd = cwd ? resolveTarget(cwd) : getActiveWorkingDir();
+  let cwdIsDirectory = false;
   try {
-    setActiveWorkingDir(actualCwd);
-  } catch {}
-
-  // Detect direct cd / Set-Location commands to update session working directory
-  const cdMatch = command.match(/^\s*(?:cd|Set-Location)\s+['"]?([^'";\n\r]+)['"]?\s*$/i);
-  if (cdMatch) {
-    try {
-      setActiveWorkingDir(cdMatch[1]);
-    } catch {}
+    cwdIsDirectory = fsSync.statSync(actualCwd).isDirectory();
+  } catch {
+    cwdIsDirectory = false;
+  }
+  if (!cwdIsDirectory) {
+    throw new Error(`Working directory does not exist or is not a directory: ${actualCwd}`);
   }
 
-  const timeout = Math.min(timeoutMs || config.commandTimeoutMs, 900_000);
+  const timeout = Math.min(timeoutMs ?? config.commandTimeoutMs, 900_000);
   const executable = shell === "cmd" ? "cmd.exe" : "powershell.exe";
 
   // Ensure UTF-8 output encoding on Windows shells
@@ -73,12 +80,12 @@ export async function executeCommand(
           utf8Command,
         ];
 
-  const env = {
-    ...process.env,
+  // Never pass the MCP API key or tunnel credentials to commands run by clients.
+  const env = scrubbedEnv({
     PYTHONIOENCODING: "utf-8",
     LANG: "en_US.UTF-8",
     LC_ALL: "en_US.UTF-8",
-  };
+  });
 
   const result = await new Promise<CommandExecutionResult>((resolve, reject) => {
     const child = spawn(executable, args, {
@@ -136,6 +143,16 @@ export async function executeCommand(
       });
     });
   });
+
+  // A bare `cd <dir>` updates the shared working directory, but only after it succeeded.
+  const cdMatch = command.match(CD_COMMAND);
+  if (cdMatch && result.exitCode === 0 && !result.timedOut) {
+    try {
+      setActiveWorkingDir(path.resolve(actualCwd, cdMatch[1].trim()));
+    } catch {
+      // Ignore: target is outside the sandbox or not a directory.
+    }
+  }
 
   auditLog("terminal_execute", {
     command,

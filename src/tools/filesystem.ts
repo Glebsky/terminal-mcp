@@ -1,13 +1,74 @@
 import * as fs from "node:fs/promises";
-import type { Dirent } from "node:fs";
+import type { Dirent, Stats } from "node:fs";
+import * as fsSync from "node:fs";
 import * as path from "node:path";
 
 import { config } from "../config.js";
 import { auditLog } from "../utils/logger.js";
 
-import * as fsSync from "node:fs";
-
+/**
+ * Shared working directory used to resolve relative paths.
+ * It is process-wide (shared by all clients) and only changes through
+ * workspace_set_cwd or a successful bare `cd <dir>` terminal command.
+ */
 let currentWorkingDir: string = config.filesRoot;
+
+function realpathOrResolve(target: string): string {
+  try {
+    return fsSync.realpathSync.native(target);
+  } catch {
+    return path.resolve(target);
+  }
+}
+
+const realFilesRoot = realpathOrResolve(config.filesRoot);
+
+/** True when `target` equals `root` or lies inside it. */
+export function isInside(root: string, target: string): boolean {
+  const relative = path.relative(root, target);
+  return relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+function isSamePath(left: string, right: string): boolean {
+  return path.relative(left, right) === "";
+}
+
+/**
+ * Resolves symlinks/junctions of the deepest existing ancestor, so paths that do
+ * not exist yet are checked too. Returns null for dangling links (unsafe to follow).
+ */
+function realTarget(target: string): string | null {
+  let existing = path.resolve(target);
+  const rest: string[] = [];
+  for (;;) {
+    try {
+      const real = fsSync.realpathSync.native(existing);
+      return rest.length ? path.join(real, ...rest.reverse()) : real;
+    } catch {
+      try {
+        fsSync.lstatSync(existing);
+        return null; // Entry exists but cannot be resolved: dangling symlink/junction.
+      } catch {
+        // Does not exist: continue with the parent.
+      }
+      const parent = path.dirname(existing);
+      if (parent === existing) return path.resolve(target);
+      rest.push(path.basename(existing));
+      existing = parent;
+    }
+  }
+}
+
+function enforceSandbox(target: string, input: string): string {
+  if (config.fullAccess) return target;
+  const real = realTarget(target);
+  if (!isInside(config.filesRoot, target) || real === null || !isInside(realFilesRoot, real)) {
+    throw new Error(
+      `Access denied: path "${input}" is outside sandbox directory (${config.filesRoot}). Set FULL_ACCESS=true to permit arbitrary paths.`,
+    );
+  }
+  return target;
+}
 
 export function getActiveWorkingDir(): string {
   return currentWorkingDir;
@@ -15,27 +76,34 @@ export function getActiveWorkingDir(): string {
 
 export function setActiveWorkingDir(newDir: string): string {
   const resolved = resolveTarget(newDir);
+  let stat: Stats;
   try {
-    const stat = fsSync.statSync(resolved);
-    if (stat.isDirectory()) {
-      currentWorkingDir = resolved;
-      return currentWorkingDir;
-    }
+    stat = fsSync.statSync(resolved);
   } catch {
-    // Keep resolved path
+    throw new Error(`Directory not found: ${resolved}`);
+  }
+  if (!stat.isDirectory()) {
+    throw new Error(`Not a directory: ${resolved}`);
   }
   currentWorkingDir = resolved;
   return currentWorkingDir;
 }
 
 /**
- * Resolves a given path against the active working directory or FILES_ROOT
- * with smart candidate resolution for subprojects and sandbox validation.
+ * Resolves a path deterministically and validates it against the sandbox.
+ *
+ * - Absolute paths are used as-is.
+ * - Relative paths resolve against the active working directory. If the path
+ *   does not exist there but exists relative to FILES_ROOT, the FILES_ROOT
+ *   location is used. No other directories are searched and resolution never
+ *   changes the active working directory.
+ * - Unless FULL_ACCESS=true, the real path (after resolving symlinks and
+ *   junctions) must stay inside FILES_ROOT.
  */
 export function resolveTarget(input: string): string {
   let cleaned = (input || "").trim();
   if (!cleaned) {
-    return currentWorkingDir;
+    return enforceSandbox(currentWorkingDir, input);
   }
 
   // Strip leading slash from Windows absolute paths like "/C:/foo"
@@ -44,90 +112,17 @@ export function resolveTarget(input: string): string {
   }
 
   let target: string;
-
   if (path.isAbsolute(cleaned)) {
     target = path.resolve(cleaned);
   } else {
-    // Relative path resolution with intelligent candidate matching
     const fromCwd = path.resolve(currentWorkingDir, cleaned);
     const fromRoot = path.resolve(config.filesRoot, cleaned);
-
-    // 1. If cwd is a subproject and fromCwd exists, use it
-    if (currentWorkingDir !== config.filesRoot && fsSync.existsSync(fromCwd)) {
-      target = fromCwd;
-    }
-    // 2. If path starts with a project folder from root (e.g. "sandustry/src/...") and exists from root
-    else if (fsSync.existsSync(fromRoot)) {
-      target = fromRoot;
-      const rel = path.relative(config.filesRoot, target);
-      const topDir = rel.split(path.sep)[0];
-      if (topDir && topDir !== "..") {
-        const subproject = path.join(config.filesRoot, topDir);
-        try {
-          if (fsSync.statSync(subproject).isDirectory()) {
-            currentWorkingDir = subproject;
-          }
-        } catch {}
-      }
-    }
-    // 3. Search immediate subdirectories under filesRoot for an existing match
-    else {
-      let foundInSub: string | null = null;
-      let matchedSubdir: string | null = null;
-
-      try {
-        const subdirs = fsSync
-          .readdirSync(config.filesRoot, { withFileTypes: true })
-          .filter((d) => d.isDirectory() && !d.name.startsWith("."))
-          .map((d) => d.name);
-
-        for (const sub of subdirs) {
-          const candidate = path.resolve(config.filesRoot, sub, cleaned);
-          if (fsSync.existsSync(candidate)) {
-            foundInSub = candidate;
-            matchedSubdir = path.join(config.filesRoot, sub);
-            break;
-          }
-        }
-
-        // If file doesn't exist, check if parent directory exists in a subdirectory (for creating new files)
-        if (!foundInSub) {
-          const dirPart = path.dirname(cleaned);
-          if (dirPart && dirPart !== ".") {
-            for (const sub of subdirs) {
-              const candidateDir = path.resolve(config.filesRoot, sub, dirPart);
-              if (fsSync.existsSync(candidateDir)) {
-                foundInSub = path.resolve(config.filesRoot, sub, cleaned);
-                matchedSubdir = path.join(config.filesRoot, sub);
-                break;
-              }
-            }
-          }
-        }
-      } catch {
-        // Ignore fsSync errors
-      }
-
-      if (foundInSub && matchedSubdir) {
-        target = foundInSub;
-        currentWorkingDir = matchedSubdir;
-      } else if (currentWorkingDir !== config.filesRoot) {
-        target = fromCwd;
-      } else {
-        target = fromRoot;
-      }
-    }
+    target = fromCwd !== fromRoot && !fsSync.existsSync(fromCwd) && fsSync.existsSync(fromRoot)
+      ? fromRoot
+      : fromCwd;
   }
 
-  if (config.fullAccess) return target;
-
-  const relative = path.relative(config.filesRoot, target);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error(
-      `Access denied: path "${input}" is outside sandbox directory (${config.filesRoot}). Set FULL_ACCESS=true to permit arbitrary paths.`,
-    );
-  }
-  return target;
+  return enforceSandbox(target, input);
 }
 
 export async function readFile(
@@ -141,6 +136,9 @@ export async function readFile(
 
   try {
     const stat = await handle.stat();
+    if (stat.isDirectory()) {
+      throw new Error(`Path is a directory: ${target}`);
+    }
     const bytesToRead = Math.min(
       length || config.maxFileBytes,
       Math.max(0, stat.size - offset),
@@ -195,30 +193,45 @@ export async function replaceInFile(
   allowMultiple = false,
 ) {
   const target = resolveTarget(inputPath);
+  const stat = await fs.stat(target);
+  if (stat.size > config.maxFileBytes) {
+    throw new Error(`File exceeds MAX_FILE_BYTES (${config.maxFileBytes})`);
+  }
   const original = await fs.readFile(target, "utf8");
 
-  if (!original.includes(targetContent)) {
+  const occurrences = original.split(targetContent).length - 1;
+  if (occurrences === 0) {
     throw new Error(`Target content was not found in file "${inputPath}". Verify exact whitespace, indentation, and newlines.`);
   }
-
-  const occurrences = original.split(targetContent).length - 1;
   if (occurrences > 1 && !allowMultiple) {
     throw new Error(
       `Target content appears ${occurrences} times in file "${inputPath}". Provide more unique surrounding context or set allow_multiple: true.`,
     );
   }
 
-  const updated = allowMultiple
-    ? original.replaceAll(targetContent, replacementContent)
-    : original.replace(targetContent, replacementContent);
+  // Literal replacement: never interpret `$&`, `$$`, `$'` etc. as String.replace patterns.
+  let updated: string;
+  let replacements: number;
+  if (allowMultiple) {
+    updated = original.split(targetContent).join(replacementContent);
+    replacements = occurrences;
+  } else {
+    const index = original.indexOf(targetContent);
+    updated = original.slice(0, index) + replacementContent + original.slice(index + targetContent.length);
+    replacements = 1;
+  }
+
+  if (Buffer.byteLength(updated, "utf8") > config.maxFileBytes) {
+    throw new Error(`Result exceeds MAX_FILE_BYTES (${config.maxFileBytes})`);
+  }
 
   await fs.writeFile(target, updated, "utf8");
 
-  auditLog("file_replace", { path: target, replacements: occurrences });
+  auditLog("file_replace", { path: target, replacements });
 
   return {
     path: target,
-    replacements: allowMultiple ? occurrences : 1,
+    replacements,
   };
 }
 
@@ -228,24 +241,25 @@ export interface FileEntry {
   size?: number;
 }
 
+// Recursive listing/search never descends into these directories.
+const SKIPPED_LIST_DIRS = new Set(["node_modules", ".git"]);
+const SKIPPED_SEARCH_DIRS = new Set(["node_modules", ".git", "dist"]);
+
 export async function listFiles(
   inputPath: string,
   recursive = false,
   maxEntries = 500,
 ) {
   const root = resolveTarget(inputPath);
-  try {
-    const stat = await fs.stat(root);
-    if (stat.isDirectory()) {
-      currentWorkingDir = root;
-    }
-  } catch {}
-
   const entries: FileEntry[] = [];
+  let truncated = false;
 
   const visit = async (directory: string): Promise<void> => {
     for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
-      if (entries.length >= maxEntries) return;
+      if (entries.length >= maxEntries) {
+        truncated = true;
+        return;
+      }
       const fullPath = path.join(directory, entry.name);
       const item: FileEntry = {
         path: fullPath,
@@ -253,11 +267,16 @@ export async function listFiles(
       };
 
       if (entry.isFile()) {
-        item.size = (await fs.stat(fullPath)).size;
+        try {
+          item.size = (await fs.stat(fullPath)).size;
+        } catch {
+          // File disappeared or is not accessible.
+        }
       }
 
       entries.push(item);
-      if (recursive && entry.isDirectory()) {
+      // Symlinked directories are reported but not followed.
+      if (recursive && entry.isDirectory() && !SKIPPED_LIST_DIRS.has(entry.name)) {
         await visit(fullPath);
       }
     }
@@ -267,7 +286,7 @@ export async function listFiles(
   return {
     root,
     entries,
-    truncated: entries.length >= maxEntries,
+    truncated,
   };
 }
 
@@ -286,6 +305,26 @@ export interface SearchMatch {
   snippet?: string;
 }
 
+export const MAX_SEARCH_QUERY_LENGTH = 512;
+const MAX_SEARCH_LINE_LENGTH = 4000;
+// A group containing a quantifier that is itself quantified, e.g. (a+)+ or (\w*)*.
+const NESTED_QUANTIFIER = /\((?:[^()\\]|\\.)*[+*}](?:[^()\\]|\\.)*\)\s*(?:[+*]|\{\d+,\d*\})/;
+
+/** Compile a user-provided search regex with basic protection against catastrophic backtracking. */
+export function compileSearchQuery(query: string, caseSensitive = false): RegExp {
+  if (query.length > MAX_SEARCH_QUERY_LENGTH) {
+    throw new Error(`Search query is too long (max ${MAX_SEARCH_QUERY_LENGTH} characters)`);
+  }
+  if (NESTED_QUANTIFIER.test(query)) {
+    throw new Error("Search query rejected: nested quantifiers such as (a+)+ can hang the server. Simplify the pattern.");
+  }
+  try {
+    return new RegExp(query, caseSensitive ? "" : "i");
+  } catch (error) {
+    throw new Error(`Invalid search regex: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 export async function searchFiles(
   inputPath: string,
   pattern?: string,
@@ -294,71 +333,66 @@ export async function searchFiles(
   maxResults = 100,
 ) {
   const root = resolveTarget(inputPath);
-  try {
-    const stat = await fs.stat(root);
-    if (stat.isDirectory()) {
-      currentWorkingDir = root;
-    }
-  } catch {}
-
   const results: SearchMatch[] = [];
-
-  let queryRegex: RegExp | null = null;
-  if (query) {
-    queryRegex = new RegExp(query, caseSensitive ? "g" : "gi");
-  }
+  const queryRegex = query ? compileSearchQuery(query, caseSensitive) : null;
+  let truncated = false;
 
   const visit = async (directory: string): Promise<void> => {
-    if (results.length >= maxResults) return;
+    if (results.length >= maxResults) {
+      truncated = true;
+      return;
+    }
 
     let dirEntries: Dirent[] = [];
     try {
-
       dirEntries = await fs.readdir(directory, { withFileTypes: true });
     } catch {
       return;
     }
 
     for (const entry of dirEntries) {
-      if (results.length >= maxResults) return;
+      if (results.length >= maxResults) {
+        truncated = true;
+        return;
+      }
       const fullPath = path.join(directory, entry.name);
 
       if (entry.isDirectory()) {
-        // Skip common noisy directories
-        if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "dist") {
-          continue;
-        }
+        if (SKIPPED_SEARCH_DIRS.has(entry.name)) continue;
         await visit(fullPath);
       } else if (entry.isFile()) {
         const filenameMatches = !pattern || matchesGlob(entry.name, pattern);
         if (!filenameMatches) continue;
 
         if (!queryRegex) {
-          // Filename only match
           results.push({ path: fullPath });
-        } else {
-          // Content search
-          try {
-            const stat = await fs.stat(fullPath);
-            if (stat.size > 2 * 1024 * 1024) continue; // Skip files > 2MB for grep
+          continue;
+        }
 
-            const content = await fs.readFile(fullPath, "utf8");
-            const lines = content.split(/\r?\n/);
+        try {
+          const stat = await fs.stat(fullPath);
+          if (stat.size > 2 * 1024 * 1024) continue; // Skip files > 2MB for grep
 
-            for (let i = 0; i < lines.length; i++) {
-              if (results.length >= maxResults) break;
-              if (queryRegex.test(lines[i])) {
-                queryRegex.lastIndex = 0; // Reset regex state
-                results.push({
-                  path: fullPath,
-                  line: i + 1,
-                  snippet: lines[i].trim(),
-                });
-              }
+          const content = await fs.readFile(fullPath, "utf8");
+          if (content.includes("\u0000")) continue; // Skip binary files
+          const lines = content.split(/\r?\n/);
+
+          for (let i = 0; i < lines.length; i++) {
+            if (results.length >= maxResults) {
+              truncated = true;
+              break;
             }
-          } catch {
-            // Skip non-text or unreadable files
+            const line = lines[i].length > MAX_SEARCH_LINE_LENGTH ? lines[i].slice(0, MAX_SEARCH_LINE_LENGTH) : lines[i];
+            if (queryRegex.test(line)) {
+              results.push({
+                path: fullPath,
+                line: i + 1,
+                snippet: line.trim().slice(0, 500),
+              });
+            }
           }
+        } catch {
+          // Skip unreadable files
         }
       }
     }
@@ -376,17 +410,27 @@ export async function searchFiles(
   return {
     root,
     results,
-    truncated: results.length >= maxResults,
+    truncated,
   };
 }
 
 export async function statPath(inputPath: string) {
   const target = resolveTarget(inputPath);
-  const stat = await fs.stat(target);
+  const linkStat = await fs.lstat(target);
+  const isSymlink = linkStat.isSymbolicLink();
+  let stat: Stats = linkStat;
+  let linkTarget: string | undefined;
+
+  if (isSymlink) {
+    linkTarget = await fs.readlink(target).catch(() => undefined);
+    stat = await fs.stat(target).catch(() => linkStat);
+  }
 
   return {
     path: target,
-    type: stat.isDirectory() ? "directory" : "file",
+    type: isSymlink ? "symlink" : stat.isDirectory() ? "directory" : "file",
+    target_type: isSymlink ? (stat.isDirectory() ? "directory" : stat === linkStat ? "missing" : "file") : undefined,
+    link_target: linkTarget,
     size: stat.size,
     created_at: stat.birthtime.toISOString(),
     modified_at: stat.mtime.toISOString(),
@@ -401,6 +445,26 @@ export async function createDirectory(inputPath: string) {
   return { path: target, created: true };
 }
 
+async function pathExists(target: string): Promise<boolean> {
+  try {
+    await fs.lstat(target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function renameOrCopy(from: string, to: string): Promise<void> {
+  try {
+    await fs.rename(from, to);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
+    // Different drive/volume: copy, then remove the source.
+    await fs.cp(from, to, { recursive: true, errorOnExist: true, force: false, verbatimSymlinks: true });
+    await fs.rm(from, { recursive: true, force: false });
+  }
+}
+
 export async function movePath(
   source: string,
   destination: string,
@@ -409,14 +473,45 @@ export async function movePath(
   const from = resolveTarget(source);
   const to = resolveTarget(destination);
 
-  await fs.mkdir(path.dirname(to), { recursive: true });
-  if (overwrite) {
-    await fs.rm(to, { recursive: true, force: true });
+  if (from === to) {
+    throw new Error("Source and destination are the same path");
+  }
+  await fs.lstat(from); // Fails with ENOENT when the source is missing.
+
+  const caseOnlyRename = process.platform === "win32" && from.toLowerCase() === to.toLowerCase();
+  if (!caseOnlyRename && isInside(from, to)) {
+    throw new Error("Cannot move a directory into itself");
   }
 
-  await fs.rename(from, to);
+  const destinationExists = !caseOnlyRename && (await pathExists(to));
+  if (destinationExists && !overwrite) {
+    throw new Error(`Destination already exists: ${to}. Set overwrite=true to replace it.`);
+  }
+
+  await fs.mkdir(path.dirname(to), { recursive: true });
+
+  // Keep the old destination until the move succeeded, so a failure loses nothing.
+  let backup: string | null = null;
+  if (destinationExists) {
+    backup = `${to}.mcp-backup-${Date.now()}`;
+    await fs.rename(to, backup);
+  }
+
+  try {
+    await renameOrCopy(from, to);
+  } catch (error) {
+    if (backup) {
+      await fs.rename(backup, to).catch(() => undefined);
+    }
+    throw error;
+  }
+
+  if (backup) {
+    await fs.rm(backup, { recursive: true, force: true });
+  }
+
   auditLog("file_move", { from, to, overwrite });
-  return { source: from, destination: to };
+  return { source: from, destination: to, replaced: destinationExists };
 }
 
 export async function deletePath(inputPath: string, recursive = false) {
@@ -426,13 +521,23 @@ export async function deletePath(inputPath: string, recursive = false) {
   if (target === parsed.root) {
     throw new Error("Refusing to delete a filesystem root directory");
   }
+  if (isSamePath(target, config.filesRoot) || isSamePath(target, realFilesRoot) || isInside(target, config.filesRoot)) {
+    throw new Error("Refusing to delete FILES_ROOT or a directory that contains it");
+  }
 
-  const stat = await fs.stat(target);
-  if (stat.isDirectory() && !recursive) {
+  const stat = await fs.lstat(target);
+  const isDirectory = stat.isDirectory();
+  if (isDirectory && !recursive) {
     throw new Error("recursive=true is required to delete a directory");
   }
 
-  await fs.rm(target, { recursive, force: false });
+  // Symlinks/junctions are removed themselves; their targets are never touched.
+  await fs.rm(target, { recursive: isDirectory && recursive, force: false });
+
+  if (isInside(target, currentWorkingDir)) {
+    currentWorkingDir = config.filesRoot;
+  }
+
   auditLog("file_delete", { path: target, recursive });
   return { path: target, deleted: true };
 }

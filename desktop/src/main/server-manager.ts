@@ -151,6 +151,7 @@ export class ServerManager {
       COMMAND_TIMEOUT_MS: "120000",
       MAX_OUTPUT_BYTES: "1048576",
       MAX_FILE_BYTES: "10485760",
+      DISABLED_TOOLS: "",
     };
 
     try {
@@ -180,6 +181,14 @@ export class ServerManager {
       updated.NGROK_ENABLED = updated.TUNNEL_PROVIDER === "ngrok" ? "true" : "false";
       if (Object.values(updated).some(value => typeof value === "string" && /[\r\n]/.test(value))) throw new Error("Settings cannot contain line breaks");
       if (updated.ALLOWED_HOSTS.split(";").some(host => host.trim() === "*")) throw new Error("Use specific allowed Host names, not a global wildcard");
+      if (updated.FULL_ACCESS === "") updated.FULL_ACCESS = "false";
+      if (!["true", "false"].includes(updated.FULL_ACCESS)) throw new Error("Full access must be true or false");
+      if (updated.FILES_ROOT.trim()) {
+        const resolvedRoot = path.resolve(updated.FILES_ROOT.trim());
+        if (path.parse(resolvedRoot).root === resolvedRoot) throw new Error("Files root cannot be a drive or filesystem root");
+      }
+      updated.DISABLED_TOOLS = updated.DISABLED_TOOLS.split(/[;,\s]+/).map(name => name.trim().toLowerCase()).filter(Boolean).join(";");
+      if (updated.DISABLED_TOOLS && !/^[a-z0-9_;]+$/.test(updated.DISABLED_TOOLS)) throw new Error("Disabled tools must be tool names separated by semicolons");
       const envPath = this.getEnvPath();
 
       const lines = [
@@ -205,6 +214,7 @@ export class ServerManager {
         `COMMAND_TIMEOUT_MS=${updated.COMMAND_TIMEOUT_MS}`,
         `MAX_OUTPUT_BYTES=${updated.MAX_OUTPUT_BYTES}`,
         `MAX_FILE_BYTES=${updated.MAX_FILE_BYTES}`,
+        `DISABLED_TOOLS=${updated.DISABLED_TOOLS}`,
       ];
 
       // Quote literal values so #, spaces and Windows paths survive dotenv parsing.

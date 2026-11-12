@@ -4,6 +4,7 @@ import type { EnvConfig } from "../../types";
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle, Input, Switch } from "../lib/shadcn/ui";
 import { SettingsField } from "./SettingsField";
 import { TunnelSettings } from "./TunnelSettings";
+import { ToolSettings } from "./ToolSettings";
 import "../styles/settings.css";
 interface SettingsModalProps {
   isOpen: boolean; onClose: () => void; onSaved: () => void;
@@ -81,6 +82,7 @@ export function SettingsModal({ isOpen, onClose, onSaved, animation, onAnimation
               <div className="settings-field mt-3"><label htmlFor={rootId}>Sandbox root directory</label><div className="settings-actions-row"><Input id={rootId} value={config.FILES_ROOT} required onChange={event => updateConfig({ ...config, FILES_ROOT: event.target.value })}/><Button size="sm" onClick={() => void selectFolder()}><Folder/> Browse</Button></div></div>
               <div className="mt-3"><SettingsField config={config} onChange={updateConfig} name="ALLOWED_HOSTS" label="Allowed Host headers" note="Separate entries with semicolons. The active tunnel adds only its exact hostname for that session. Do not use a global wildcard." required/></div>
             </section>
+            <ToolSettings config={config} onChange={updateConfig}/>
           </fieldset>
           {error && <div className="settings-alert settings-error" role="alert"><AlertCircle/><p>{error}</p></div>}
           {savedSuccess && <div className="settings-alert" role="status"><Check/><p>Settings saved. Restart the server explicitly to apply connection or security changes. The active server was not interrupted.</p></div>}

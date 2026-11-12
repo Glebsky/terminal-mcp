@@ -57,6 +57,8 @@ export interface EnvConfig {
   COMMAND_TIMEOUT_MS: string;
   MAX_OUTPUT_BYTES: string;
   MAX_FILE_BYTES: string;
+  /** Semicolon-separated MCP tool names hidden from agents. */
+  DISABLED_TOOLS: string;
 }
 
 export interface ElectronAPI {
