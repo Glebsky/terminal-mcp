@@ -2,6 +2,7 @@ import React from "react";
 import { Minus, Square, X, Shield, Globe, ArrowDownToLine } from "lucide-react";
 import stationIcon from "../../../icon-32.svg";
 import { tunnelProviderLabels, type ServerStatus } from "../../types";
+import { useI18n, type MessageKey } from "../i18n";
 
 
 
@@ -11,6 +12,7 @@ interface TitleBarProps {
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({ status, onOpenSettings }) => {
+  const { t } = useI18n();
   const isRunning = status.state === "running";
 
   return (
@@ -46,28 +48,28 @@ export const TitleBar: React.FC<TitleBarProps> = ({ status, onOpenSettings }) =>
             }`}
           />
           <span className="font-mono uppercase text-[11px] font-semibold text-slate-300">
-            {status.state}
+            {t(("state." + status.state) as MessageKey)}
           </span>
           <span className="text-white/20">|</span>
-          <span className="text-[11px] text-slate-400 font-mono">Port {status.port}</span>
+          <span className="text-[11px] text-slate-400 font-mono">{t("titlebar.port", { port: status.port })}</span>
         </div>
 
         {status.tunnelUrl && (
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-950/40 border border-cyan-500/20 text-cyan-400 text-xs font-mono">
             <Globe className="w-3 h-3 text-cyan-400" />
-            <span className="text-[11px] font-medium">{tunnelProviderLabels[status.tunnelProvider]} · {status.tunnelState === "unverified" ? "Unverified" : "Connected"}</span>
+            <span className="text-[11px] font-medium">{tunnelProviderLabels[status.tunnelProvider]} · {status.tunnelState === "unverified" ? t("tunnel.state.unverified") : t("tunnel.state.connected")}</span>
           </div>
         )}
 
         {status.fullAccess ? (
           <div className="flex items-center gap-1 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-mono">
             <Shield className="w-3 h-3" />
-            <span>FULL ACCESS</span>
+            <span>{t("titlebar.fullAccess")}</span>
           </div>
         ) : (
           <div className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800/40 border border-white/5 text-slate-400 text-[10px] font-mono">
             <Shield className="w-3 h-3 text-emerald-400/80" />
-            <span>SANDBOX</span>
+            <span>{t("titlebar.sandbox")}</span>
           </div>
         )}
       </div>
@@ -77,28 +79,28 @@ export const TitleBar: React.FC<TitleBarProps> = ({ status, onOpenSettings }) =>
         <button
           onClick={() => window.electronAPI.minimizeWindow()}
           className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-          title="Свернуть на панель задач"
+          title={t("titlebar.minimize")}
         >
           <Minus className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => window.electronAPI.hideToTray()}
           className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/10 text-slate-400 hover:text-cyan-400 transition-colors"
-          title="Свернуть в трей (скрыть с панели задач)"
+          title={t("titlebar.tray")}
         >
           <ArrowDownToLine className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => window.electronAPI.maximizeWindow()}
           className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-          title="Развернуть"
+          title={t("titlebar.maximize")}
         >
           <Square className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => window.electronAPI.closeWindow()}
           className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors"
-          title="Закрыть (свернуть в трей)"
+          title={t("titlebar.close")}
         >
           <X className="w-4 h-4" />
         </button>
