@@ -4,6 +4,8 @@ import * as fs from "node:fs/promises";
 import * as crypto from "node:crypto";
 import dotenv from "dotenv";
 import type { EnvConfig, LogEntry, ServerStatus, MonitorSnapshot } from "../types.js";
+/** Must match the server's acknowledgement phrase for AUTH_METHODS=none. */
+const NO_AUTH_ACK = "I_UNDERSTAND_ANYONE_CAN_CONTROL_THIS_PC";
 
 export class ServerManager {
   private process: ChildProcess | null = null;
@@ -132,6 +134,10 @@ export class ServerManager {
       PORT: "3100",
       HOST: "127.0.0.1",
       MCP_API_KEY: "",
+      AUTH_METHODS: "bearer",
+      BASIC_AUTH_USER: "",
+      BASIC_AUTH_PASSWORD: "",
+      ALLOW_NO_AUTH: "",
       FULL_ACCESS: "false",
       FILES_ROOT: path.join(this.configDir, "workspace"),
       TUNNEL_PROVIDER: "none",
@@ -173,7 +179,15 @@ export class ServerManager {
       const current = await this.getEnvConfig();
       const updated = { ...current, ...newConfig };
       if (Object.keys(current).some(key => typeof updated[key as keyof EnvConfig] !== "string")) throw new Error("Settings must contain text values only");
-      if (updated.MCP_API_KEY.length < 32) throw new Error("MCP Bearer key must contain at least 32 characters");
+      updated.AUTH_METHODS = updated.AUTH_METHODS.split(/[;,\s]+/).map(name => name.trim().toLowerCase()).filter(Boolean).join(";") || "bearer";
+      const authMethods = new Set(updated.AUTH_METHODS.split(";"));
+      if ([...authMethods].some(name => !["bearer", "query", "basic", "none"].includes(name))) throw new Error("Unknown authentication method");
+      if ((authMethods.has("bearer") || authMethods.has("query")) && updated.MCP_API_KEY.length < 32) throw new Error("MCP Bearer key must contain at least 32 characters");
+      if (authMethods.has("basic") && (!updated.BASIC_AUTH_USER.trim() || updated.BASIC_AUTH_USER.includes(":"))) throw new Error("Basic authentication needs a login without ':'");
+      if (authMethods.has("basic") && updated.BASIC_AUTH_PASSWORD.length < 12) throw new Error("Basic authentication password must contain at least 12 characters");
+      // Without "none" the acknowledgement is cleared, so turning it back on always asks again.
+      if (!authMethods.has("none")) updated.ALLOW_NO_AUTH = "";
+      else if (updated.ALLOW_NO_AUTH !== NO_AUTH_ACK) throw new Error("Turning authentication off needs the risk confirmation");
       if (!/^\d+$/.test(updated.PORT) || Number(updated.PORT) < 1 || Number(updated.PORT) > 65535) throw new Error("Port must be between 1 and 65535");
       for (const key of ["COMMAND_TIMEOUT_MS", "MAX_OUTPUT_BYTES", "MAX_FILE_BYTES"] as const) if (!/^\d+$/.test(updated[key]) || Number(updated[key]) < 1) throw new Error("Server limits must be positive integers");
       if (!["quick", "named"].includes(updated.CLOUDFLARE_MODE)) throw new Error("Invalid Cloudflare mode");
@@ -193,6 +207,10 @@ export class ServerManager {
 
       const lines = [
         `MCP_API_KEY=${updated.MCP_API_KEY}`,
+        `AUTH_METHODS=${updated.AUTH_METHODS}`,
+        `BASIC_AUTH_USER=${updated.BASIC_AUTH_USER}`,
+        `BASIC_AUTH_PASSWORD=${updated.BASIC_AUTH_PASSWORD}`,
+        `ALLOW_NO_AUTH=${updated.ALLOW_NO_AUTH}`,
         `PORT=${updated.PORT}`,
         `HOST=${updated.HOST}`,
         `ALLOWED_HOSTS=${updated.ALLOWED_HOSTS}`,

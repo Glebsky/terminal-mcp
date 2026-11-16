@@ -38,6 +38,12 @@ export interface EnvConfig {
   PORT: string;
   HOST: string;
   MCP_API_KEY: string;
+  /** Semicolon-separated: bearer, query, basic, none. */
+  AUTH_METHODS: string;
+  BASIC_AUTH_USER: string;
+  BASIC_AUTH_PASSWORD: string;
+  /** Must equal the acknowledgement phrase when AUTH_METHODS includes none. */
+  ALLOW_NO_AUTH: string;
   FULL_ACCESS: string;
   FILES_ROOT: string;
   TUNNEL_PROVIDER: TunnelProvider;

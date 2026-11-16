@@ -148,6 +148,19 @@ This PowerShell script automatically:
 
 ---
 
+## Authentication methods
+
+`AUTH_METHODS` (semicolon-separated, default `bearer`) chooses how clients sign in; any enabled method is accepted. The desktop app has the same switches under **Settings → Security**.
+
+| Method | Client sends | Notes |
+|---|---|---|
+| `bearer` | `Authorization: Bearer <MCP_API_KEY>` or `x-api-key: <MCP_API_KEY>` | Default and recommended. |
+| `query` | `…/mcp?key=<MCP_API_KEY>` (also `api_key`, `token`; `/sse?key=…` works too) | For clients that only take a URL. The key can appear in tunnel/proxy logs. |
+| `basic` | HTTP Basic with `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` (12+ chars) | For clients with login/password fields. |
+| `none` | nothing | **Anyone who reaches the server or its tunnel controls this PC.** Requires `ALLOW_NO_AUTH=I_UNDERSTAND_ANYONE_CAN_CONTROL_THIS_PC`; consider `DISABLED_TOOLS` and `FULL_ACCESS=false`. |
+
+`MCP_API_KEY` is required only while `bearer` or `query` is enabled. Changes apply after a restart.
+
 ## Available MCP Tools (20 Tools)
 
 See [AGENTS.md](AGENTS.md) for full JSON schemas, input parameters, response formats, and agent best practices.

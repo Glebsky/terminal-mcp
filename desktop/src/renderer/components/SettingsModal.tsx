@@ -6,7 +6,10 @@ import { isLanguage, languages, useI18n } from "../i18n";
 import { SettingsField } from "./SettingsField";
 import { TunnelSettings } from "./TunnelSettings";
 import { ToolSettings } from "./ToolSettings";
+import { AuthSettings, parseAuthMethods } from "./AuthSettings";
 import "../styles/settings.css";
+/** The API key is only required while a key-based method (header or URL) is enabled. */
+const needsKey = (config: EnvConfig) => { const methods = parseAuthMethods(config.AUTH_METHODS ?? "bearer"); return methods.has("bearer") || methods.has("query"); };
 interface SettingsModalProps {
   isOpen: boolean; onClose: () => void; onSaved: () => void;
   animation: boolean; onAnimationChange: (enabled: boolean) => void;
@@ -77,10 +80,11 @@ export function SettingsModal({ isOpen, onClose, onSaved, animation, onAnimation
             <section className="settings-section" aria-labelledby="security-section">
               <h3 className="settings-section-heading" id="security-section"><Shield/> {t("settings.security")}</h3>
               <div className="settings-field"><label htmlFor={keyId}>{t("settings.apiKey")}</label><div className="settings-actions-row">
-                <Input id={keyId} type={showKey ? "text" : "password"} autoComplete="new-password" required minLength={32} value={config.MCP_API_KEY} onChange={event => updateConfig({ ...config, MCP_API_KEY: event.target.value })} aria-describedby={keyId + "-note"}/>
+                <Input id={keyId} type={showKey ? "text" : "password"} autoComplete="new-password" required={needsKey(config)} minLength={needsKey(config) ? 32 : 0} value={config.MCP_API_KEY} onChange={event => updateConfig({ ...config, MCP_API_KEY: event.target.value })} aria-describedby={keyId + "-note"}/>
                 <Button size="icon" aria-label={showKey ? t("settings.hideKey") : t("settings.showKey")} onClick={() => setShowKey(value => !value)}>{showKey ? <EyeOff/> : <Eye/>}</Button>
                 <Button size="sm" onClick={() => void generateKey()}><KeyRound/> {t("settings.generate")}</Button>
               </div><small id={keyId + "-note"}>{t("settings.apiKeyNote")}</small></div>
+              <AuthSettings config={config} onChange={updateConfig}/>
               <div className="settings-toggle-row mt-3"><div><label htmlFor="full-access">{t("settings.fullAccess")}</label><p>{t("settings.fullAccessNote")}</p></div><Switch id="full-access" checked={config.FULL_ACCESS === "true"} onCheckedChange={enabled => updateConfig({ ...config, FULL_ACCESS: String(enabled) })}/></div>
               <div className="settings-field mt-3"><label htmlFor={rootId}>{t("settings.root")}</label><div className="settings-actions-row"><Input id={rootId} value={config.FILES_ROOT} required onChange={event => updateConfig({ ...config, FILES_ROOT: event.target.value })}/><Button size="sm" onClick={() => void selectFolder()}><Folder/> {t("settings.browse")}</Button></div></div>
               <div className="mt-3"><SettingsField config={config} onChange={updateConfig} name="ALLOWED_HOSTS" label={t("settings.allowedHosts")} note={t("settings.allowedHostsNote")} required/></div>

@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { config } from "./config.js";
-import { authenticate } from "./middleware/auth.js";
+import { authDescription, authenticate } from "./middleware/auth.js";
 import { validateHost } from "./middleware/host.js";
 import { registerAllTools } from "./tools/index.js";
 import { monitorRequest, recordRequestBody, setSseCountProvider } from "./monitor.js";
@@ -65,8 +65,8 @@ export function createApp(): Express {
         messages: "/messages",
         health: "/health",
       },
-      auth_required: true,
-      auth_type: "Bearer Token",
+      auth_required: !config.auth.methods.has("none"),
+      auth_type: authDescription(),
     });
   });
 
@@ -141,7 +141,17 @@ export function createApp(): Express {
   });
 
   // Message receiver for standard SSE transport
-  app.post("/messages", validateHost, authenticate, monitorRequest, async (req, res) => {
+  // Clients that put the key in the /sse URL then post to the /messages URL the server gave them, which carries only
+  // the session id. That id is a random UUID sent only over the authenticated SSE stream, so it proves the session.
+  const authenticateMessages: express.RequestHandler = (req, res, next) => {
+    const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId.trim() : "";
+    if (config.auth.methods.has("query") && sessionId && sseSessions.has(sessionId)) {
+      next();
+      return;
+    }
+    authenticate(req, res, next);
+  };
+  app.post("/messages", validateHost, authenticateMessages, monitorRequest, async (req, res) => {
     const sessionId = (req.query.sessionId as string | undefined)?.trim();
     if (!sessionId || !sseSessions.has(sessionId)) {
       res.status(404).json({ error: "SSE session not found or expired" });

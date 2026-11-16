@@ -28,11 +28,46 @@ function registerFailure(now: number): boolean {
   return failuresInWindow > MAX_FAILURES_PER_WINDOW;
 }
 
-export function authenticate(req: Request, res: Response, next: NextFunction): void {
-  const bearer = req.header("authorization")?.replace(/^Bearer\s+/i, "") || "";
-  const apiKey = req.header("x-api-key") || "";
+/** Query parameter names accepted for the key when AUTH_METHODS includes "query". */
+export const QUERY_KEY_PARAMS = ["key", "api_key", "token"] as const;
 
-  if (safeEqual(bearer, config.apiKey) || safeEqual(apiKey, config.apiKey)) {
+function queryKey(req: Request): string {
+  for (const name of QUERY_KEY_PARAMS) {
+    const value = req.query[name];
+    if (typeof value === "string" && value) return value;
+  }
+  return "";
+}
+
+function basicCredentialsMatch(header: string): boolean {
+  const match = /^Basic\s+([A-Za-z0-9+/=]+)\s*$/i.exec(header);
+  if (!match?.[1]) return false;
+  const decoded = Buffer.from(match[1], "base64").toString("utf8");
+  const separator = decoded.indexOf(":");
+  if (separator < 0) return false;
+  // Compare both parts every time so the response time doesn't reveal which one was wrong.
+  const userOk = safeEqual(decoded.slice(0, separator), config.auth.basicUser);
+  const passwordOk = safeEqual(decoded.slice(separator + 1), config.auth.basicPassword);
+  return userOk && passwordOk;
+}
+
+/** Whether the request carries valid credentials for one of the enabled AUTH_METHODS. */
+export function isAuthorized(req: Request): boolean {
+  const methods = config.auth.methods;
+  if (methods.has("none")) return true;
+  const header = req.header("authorization") || "";
+  if (methods.has("bearer")) {
+    const bearer = header.replace(/^Bearer\s+/i, "");
+    const apiKey = req.header("x-api-key") || "";
+    if (safeEqual(bearer, config.apiKey) || safeEqual(apiKey, config.apiKey)) return true;
+  }
+  if (methods.has("query") && safeEqual(queryKey(req), config.apiKey)) return true;
+  if (methods.has("basic") && basicCredentialsMatch(header)) return true;
+  return false;
+}
+
+export function authenticate(req: Request, res: Response, next: NextFunction): void {
+  if (isAuthorized(req)) {
     next();
     return;
   }
@@ -45,6 +80,15 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
     return;
   }
 
-  res.setHeader("WWW-Authenticate", 'Bearer realm="notion-terminal-mcp"');
+  const challenges: string[] = [];
+  if (config.auth.methods.has("bearer")) challenges.push('Bearer realm="notion-terminal-mcp"');
+  if (config.auth.methods.has("basic")) challenges.push('Basic realm="notion-terminal-mcp", charset="UTF-8"');
+  if (challenges.length) res.setHeader("WWW-Authenticate", challenges);
   res.status(401).json({ error: "Unauthorized" });
+}
+
+/** Human-readable list of enabled methods for the public server info endpoint. */
+export function authDescription(): string {
+  const labels: Record<string, string> = { bearer: "Bearer Token", query: "Key in URL", basic: "HTTP Basic", none: "None" };
+  return [...config.auth.methods].map((method) => labels[method] || method).join(", ");
 }
