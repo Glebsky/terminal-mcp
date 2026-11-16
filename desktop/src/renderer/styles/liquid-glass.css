@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @layer base {
+  /* The window is transparent: keep everything outside .app-shell's rounded corners see-through. */
+  html, body, #root { background: transparent; margin: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   code, pre, .font-mono { font-family: Consolas, "Courier New", monospace; }
   button { cursor: pointer; }

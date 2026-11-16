@@ -1,36 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 256 256">
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 32 32">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1E2F5E"/>
+      <stop offset="0" stop-color="#22356A"/>
       <stop offset="1" stop-color="#0A1129"/>
     </linearGradient>
-    <radialGradient id="shine" cx=".28" cy=".18" r=".75">
-      <stop offset="0" stop-color="#7C9BFF" stop-opacity=".28"/>
-      <stop offset="1" stop-color="#7C9BFF" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".26"/>
-      <stop offset=".5" stop-color="#FFFFFF" stop-opacity=".04"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
-    </linearGradient>
-    <linearGradient id="glyph" gradientUnits="userSpaceOnUse" x1="64" y1="88" x2="196" y2="176">
+    <linearGradient id="glyph" gradientUnits="userSpaceOnUse" x1="7" y1="10" x2="25" y2="23">
       <stop offset="0" stop-color="#9FF0E6"/>
       <stop offset="1" stop-color="#8FA8FF"/>
     </linearGradient>
-    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7"/></filter>
   </defs>
-
-  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#bg)"/>
-  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#shine)"/>
-  <rect x="9" y="9" width="238" height="238" rx="55" fill="none" stroke="url(#rim)" stroke-width="2"/>
-
-  <g opacity=".45" filter="url(#glow)">
-    <path d="M68 90 L112 128 L68 166" fill="none" stroke="#8FD8F0" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
-    <rect x="128" y="156" width="66" height="20" rx="10" fill="#8FB8FF"/>
-  </g>
-  <path d="M68 90 L112 128 L68 166" fill="none" stroke="url(#glyph)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="128" y="156" width="66" height="20" rx="10" fill="url(#glyph)"/>
-
-  <circle cx="190" cy="72" r="23" fill="none" stroke="#71DEB1" stroke-opacity=".32" stroke-width="5"/>
-  <circle cx="190" cy="72" r="13" fill="#71DEB1"/>
+  <rect width="512" height="512" rx="7.5" fill="url(#bg)"/>
+  <rect x=".5" y=".5" width="31" height="31" rx="7" fill="none" stroke="#FFFFFF" stroke-opacity=".14"/>
+  <path d="M8 10.5 L13.5 16 L8 21.5" fill="none" stroke="url(#glyph)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="15.5" y="19.5" width="9" height="3" rx="1.5" fill="url(#glyph)"/>
+  <circle cx="24" cy="8.5" r="4.2" fill="none" stroke="#71DEB1" stroke-opacity=".35"/>
+  <circle cx="24" cy="8.5" r="2.4" fill="#71DEB1"/>
 </svg>
