@@ -4,6 +4,8 @@ import * as fs from "node:fs/promises";
 import * as crypto from "node:crypto";
 import dotenv from "dotenv";
 import type { EnvConfig, LogEntry, ServerStatus, MonitorSnapshot } from "../types.js";
+/** Must match the server's acknowledgement phrase for AUTH_METHODS=none. */
+const NO_AUTH_ACK = "I_UNDERSTAND_ANYONE_CAN_CONTROL_THIS_PC";
 
 export class ServerManager {
   private process: ChildProcess | null = null;
@@ -132,6 +134,10 @@ export class ServerManager {
       PORT: "3100",
       HOST: "127.0.0.1",
       MCP_API_KEY: "",
+      AUTH_METHODS: "bearer",
+      BASIC_AUTH_USER: "",
+      BASIC_AUTH_PASSWORD: "",
+      ALLOW_NO_AUTH: "",
       FULL_ACCESS: "false",
       FILES_ROOT: path.join(this.configDir, "workspace"),
       TUNNEL_PROVIDER: "none",
@@ -151,6 +157,7 @@ export class ServerManager {
       COMMAND_TIMEOUT_MS: "120000",
       MAX_OUTPUT_BYTES: "1048576",
       MAX_FILE_BYTES: "10485760",
+      DISABLED_TOOLS: "",
     };
 
     try {
@@ -172,7 +179,15 @@ export class ServerManager {
       const current = await this.getEnvConfig();
       const updated = { ...current, ...newConfig };
       if (Object.keys(current).some(key => typeof updated[key as keyof EnvConfig] !== "string")) throw new Error("Settings must contain text values only");
-      if (updated.MCP_API_KEY.length < 32) throw new Error("MCP Bearer key must contain at least 32 characters");
+      updated.AUTH_METHODS = updated.AUTH_METHODS.split(/[;,\s]+/).map(name => name.trim().toLowerCase()).filter(Boolean).join(";") || "bearer";
+      const authMethods = new Set(updated.AUTH_METHODS.split(";"));
+      if ([...authMethods].some(name => !["bearer", "query", "basic", "none"].includes(name))) throw new Error("Unknown authentication method");
+      if ((authMethods.has("bearer") || authMethods.has("query")) && updated.MCP_API_KEY.length < 32) throw new Error("MCP Bearer key must contain at least 32 characters");
+      if (authMethods.has("basic") && (!updated.BASIC_AUTH_USER.trim() || updated.BASIC_AUTH_USER.includes(":"))) throw new Error("Basic authentication needs a login without ':'");
+      if (authMethods.has("basic") && updated.BASIC_AUTH_PASSWORD.length < 12) throw new Error("Basic authentication password must contain at least 12 characters");
+      // Without "none" the acknowledgement is cleared, so turning it back on always asks again.
+      if (!authMethods.has("none")) updated.ALLOW_NO_AUTH = "";
+      else if (updated.ALLOW_NO_AUTH !== NO_AUTH_ACK) throw new Error("Turning authentication off needs the risk confirmation");
       if (!/^\d+$/.test(updated.PORT) || Number(updated.PORT) < 1 || Number(updated.PORT) > 65535) throw new Error("Port must be between 1 and 65535");
       for (const key of ["COMMAND_TIMEOUT_MS", "MAX_OUTPUT_BYTES", "MAX_FILE_BYTES"] as const) if (!/^\d+$/.test(updated[key]) || Number(updated[key]) < 1) throw new Error("Server limits must be positive integers");
       if (!["quick", "named"].includes(updated.CLOUDFLARE_MODE)) throw new Error("Invalid Cloudflare mode");
@@ -180,10 +195,22 @@ export class ServerManager {
       updated.NGROK_ENABLED = updated.TUNNEL_PROVIDER === "ngrok" ? "true" : "false";
       if (Object.values(updated).some(value => typeof value === "string" && /[\r\n]/.test(value))) throw new Error("Settings cannot contain line breaks");
       if (updated.ALLOWED_HOSTS.split(";").some(host => host.trim() === "*")) throw new Error("Use specific allowed Host names, not a global wildcard");
+      if (updated.FULL_ACCESS === "") updated.FULL_ACCESS = "false";
+      if (!["true", "false"].includes(updated.FULL_ACCESS)) throw new Error("Full access must be true or false");
+      if (updated.FILES_ROOT.trim()) {
+        const resolvedRoot = path.resolve(updated.FILES_ROOT.trim());
+        if (path.parse(resolvedRoot).root === resolvedRoot) throw new Error("Files root cannot be a drive or filesystem root");
+      }
+      updated.DISABLED_TOOLS = updated.DISABLED_TOOLS.split(/[;,\s]+/).map(name => name.trim().toLowerCase()).filter(Boolean).join(";");
+      if (updated.DISABLED_TOOLS && !/^[a-z0-9_;]+$/.test(updated.DISABLED_TOOLS)) throw new Error("Disabled tools must be tool names separated by semicolons");
       const envPath = this.getEnvPath();
 
       const lines = [
         `MCP_API_KEY=${updated.MCP_API_KEY}`,
+        `AUTH_METHODS=${updated.AUTH_METHODS}`,
+        `BASIC_AUTH_USER=${updated.BASIC_AUTH_USER}`,
+        `BASIC_AUTH_PASSWORD=${updated.BASIC_AUTH_PASSWORD}`,
+        `ALLOW_NO_AUTH=${updated.ALLOW_NO_AUTH}`,
         `PORT=${updated.PORT}`,
         `HOST=${updated.HOST}`,
         `ALLOWED_HOSTS=${updated.ALLOWED_HOSTS}`,
@@ -205,6 +232,7 @@ export class ServerManager {
         `COMMAND_TIMEOUT_MS=${updated.COMMAND_TIMEOUT_MS}`,
         `MAX_OUTPUT_BYTES=${updated.MAX_OUTPUT_BYTES}`,
         `MAX_FILE_BYTES=${updated.MAX_FILE_BYTES}`,
+        `DISABLED_TOOLS=${updated.DISABLED_TOOLS}`,
       ];
 
       // Quote literal values so #, spaces and Windows paths survive dotenv parsing.

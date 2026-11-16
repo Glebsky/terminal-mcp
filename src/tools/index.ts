@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { config } from "../config.js";
 import { textResult, errorResult } from "./types.js";
@@ -18,7 +18,31 @@ import {
 } from "./filesystem.js";
 import { browserManager } from "./browser.js";
 
+/**
+ * Register every tool except those listed in DISABLED_TOOLS. Disabled tools are removed
+ * right after registration, so they never appear in tools/list and cannot be called.
+ */
 export function registerAllTools(server: McpServer): void {
+  const disabled = config.disabledTools;
+  if (disabled.size === 0) {
+    registerTools(server);
+    return;
+  }
+  const filtered = new Proxy(server, {
+    get(target, prop, receiver) {
+      if (prop !== "registerTool") return Reflect.get(target, prop, receiver);
+      return (name: string, ...rest: unknown[]) => {
+        const register = target.registerTool as unknown as (...args: unknown[]) => RegisteredTool;
+        const tool = register.call(target, name, ...rest);
+        if (disabled.has(name)) tool.remove();
+        return tool;
+      };
+    },
+  });
+  registerTools(filtered);
+}
+
+function registerTools(server: McpServer): void {
   server.registerTool(
     "terminal_execute",
     {
@@ -459,10 +483,111 @@ export function registerAllTools(server: McpServer): void {
   );
 
   server.registerTool(
+    "browser_connect",
+    {
+      title: "Connect to running browser",
+      description:
+        "Attach to an already running Chrome/Edge with its open tabs, cookies and logged-in sessions via the remote debugging port, instead of launching a new browser. " +
+        "After connecting, browser_get_content, browser_evaluate, browser_screenshot, browser_click and browser_type work on the selected tab (by default the tab the user is looking at). " +
+        "The browser must run with --remote-debugging-port=9222 and a non-default --user-data-dir; set launch_if_missing=true to start such a browser with a persistent profile.",
+      inputSchema: {
+        endpoint: z
+          .string()
+          .optional()
+          .describe("DevTools endpoint: a port (9222), http://127.0.0.1:9222 or ws://... Defaults to BROWSER_CDP_URL or http://127.0.0.1:9222"),
+        launch_if_missing: z
+          .boolean()
+          .default(false)
+          .describe("If nothing listens on the endpoint, start Chrome/Edge with remote debugging and a persistent profile (it stays open after disconnect)"),
+        browser: z.enum(["chrome", "edge"]).default("chrome").describe("Browser to start when launch_if_missing=true"),
+        timeout_ms: z.number().int().positive().max(120_000).default(20_000).describe("How long to wait for a started browser to accept connections"),
+      },
+    },
+    async ({ endpoint, launch_if_missing, browser, timeout_ms }) => {
+      try {
+        const result = await browserManager.connect({
+          ...(endpoint ? { endpoint } : {}),
+          launchIfMissing: launch_if_missing,
+          browser,
+          timeoutMs: timeout_ms,
+        });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "browser_list_tabs",
+    {
+      title: "List browser tabs",
+      description: "List open tabs (index, url, title, whether visible to the user and whether active for browser_* tools) in the current browser session.",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const result = await browserManager.listTabs();
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "browser_select_tab",
+    {
+      title: "Select browser tab",
+      description:
+        "Choose which open tab subsequent browser_* tools operate on: by index (from browser_list_tabs), by URL or title substring, or with no arguments the tab the user is currently looking at.",
+      inputSchema: {
+        index: z.number().int().min(0).optional().describe("Tab index from browser_list_tabs"),
+        url_contains: z.string().min(1).optional().describe("Case-insensitive substring of the tab URL"),
+        title_contains: z.string().min(1).optional().describe("Case-insensitive substring of the tab title"),
+        bring_to_front: z.boolean().default(false).describe("Also switch the visible tab in the browser window"),
+      },
+    },
+    async ({ index, url_contains, title_contains, bring_to_front }) => {
+      try {
+        const result = await browserManager.selectTab({
+          ...(index !== undefined ? { index } : {}),
+          ...(url_contains ? { urlContains: url_contains } : {}),
+          ...(title_contains ? { titleContains: title_contains } : {}),
+          bringToFront: bring_to_front,
+        });
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "browser_new_tab",
+    {
+      title: "Open new tab",
+      description: "Open a new tab in the current browser session (optionally navigating to a URL) and make it the active tab for browser_* tools.",
+      inputSchema: {
+        url: z.string().min(1).optional().describe("URL to open in the new tab"),
+      },
+    },
+    async ({ url }) => {
+      try {
+        const result = await browserManager.newTab(url ? { url } : {});
+        return textResult(result);
+      } catch (error) {
+        return errorResult(error);
+      }
+    },
+  );
+
+  server.registerTool(
     "browser_close",
     {
       title: "Close browser",
-      description: "Close the active browser instance and all tabs.",
+      description:
+        "Close the browser launched by this server. If attached via browser_connect, only disconnects and leaves the user's browser and tabs open.",
       inputSchema: {},
     },
     async () => {

@@ -2,6 +2,7 @@ import React from "react";
 import { Play, Square, RotateCw, Settings, FolderOpen } from "lucide-react";
 import type { ServerStatus } from "../../types";
 import { Button } from "../lib/shadcn/ui";
+import { useI18n } from "../i18n";
 
 
 
@@ -20,6 +21,7 @@ export const Controls: React.FC<ControlsProps> = ({
   onRestart,
   onOpenSettings,
 }) => {
+  const { t } = useI18n();
   const isRunning = status.state === "running";
   const isStarting = status.state === "starting";
 
@@ -34,7 +36,7 @@ export const Controls: React.FC<ControlsProps> = ({
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-semibold text-xs tracking-wide shadow-lg shadow-emerald-500/20 border border-emerald-400/30 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
           >
             <Play className={`w-4 h-4 fill-white ${isStarting ? "animate-spin functional-motion" : ""}`} />
-            <span>{isStarting ? "Starting MCP..." : "Start Server"}</span>
+            <span>{isStarting ? t("controls.starting") : t("controls.start")}</span>
           </button>
         ) : (
           <button
@@ -42,7 +44,7 @@ export const Controls: React.FC<ControlsProps> = ({
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-semibold text-xs tracking-wide shadow-lg shadow-rose-500/20 border border-rose-400/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             <Square className="w-4 h-4 fill-white" />
-            <span>Stop Server</span>
+            <span>{t("controls.stop")}</span>
           </button>
         )}
 
@@ -50,10 +52,10 @@ export const Controls: React.FC<ControlsProps> = ({
           onClick={onRestart}
           disabled={!isRunning || isStarting}
           className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl liquid-glass-btn text-xs font-medium text-slate-300 hover:text-white disabled:opacity-40"
-          title="Restart server"
+          title={t("controls.restartTitle")}
         >
           <RotateCw className="w-3.5 h-3.5" />
-          <span>Restart</span>
+          <span>{t("controls.restart")}</span>
         </button>
       </div>
 
@@ -66,7 +68,7 @@ export const Controls: React.FC<ControlsProps> = ({
         </div>
 
         {/* Settings Button */}
-        <Button onClick={onOpenSettings} aria-haspopup="dialog"><Settings size={16}/><span>Settings</span></Button>
+        <Button onClick={onOpenSettings} aria-haspopup="dialog"><Settings size={16}/><span>{t("controls.settings")}</span></Button>
       </div>
     </div>
   );

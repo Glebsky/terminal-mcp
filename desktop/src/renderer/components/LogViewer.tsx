@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Terminal, Trash2, Filter, ArrowDown, Search } from "lucide-react";
 import { operationColor, logOperation } from "./operationColor";
 import type { LogEntry } from "../../types";
+import { useI18n, type MessageKey } from "../i18n";
 
 
 
@@ -11,6 +12,7 @@ interface LogViewerProps {
 }
 
 export const LogViewer: React.FC<LogViewerProps> = ({ logs, onClear }) => {
+  const { t } = useI18n();
   const [filter, setFilter] = useState<"all" | "audit" | "command" | "file" | "error">("all");
   const [search, setSearch] = useState("");
   const [autoScroll, setAutoScroll] = useState(true);
@@ -40,9 +42,9 @@ export const LogViewer: React.FC<LogViewerProps> = ({ logs, onClear }) => {
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-slate-950/40">
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-cyan-400" />
-          <span className="text-xs font-bold text-white uppercase tracking-wider">Live MCP Stream & Audit</span>
+          <span className="text-xs font-bold text-white uppercase tracking-wider">{t("logs.title")}</span>
           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-white/10 text-slate-400">
-            {filteredLogs.length} events
+            {t("logs.events", { count: filteredLogs.length })}
           </span>
         </div>
 
@@ -55,7 +57,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ logs, onClear }) => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search logs..."
+              placeholder={t("logs.search")}
               className="w-32 focus:w-48 transition-all h-7 pl-7 pr-2 rounded-lg bg-slate-900/90 border border-white/5 text-[11px] text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-500/40"
             />
           </div>
@@ -72,7 +74,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ logs, onClear }) => {
                     : "text-slate-400 hover:text-white"
                 }`}
               >
-                {tab}
+                {t(("logs.filter." + tab) as MessageKey)}
               </button>
             ))}
           </div>
@@ -81,7 +83,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ logs, onClear }) => {
           <button
             onClick={onClear}
             className="p-1.5 rounded-lg hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors border border-transparent hover:border-rose-500/20"
-            title="Clear logs"
+            title={t("logs.clear")}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -93,7 +95,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ logs, onClear }) => {
         {filteredLogs.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs py-12 gap-2">
             <Terminal className="w-8 h-8 text-slate-700 stroke-1" />
-            <span>No log events yet. Start the server or connect an MCP client.</span>
+            <span>{t("logs.empty")}</span>
           </div>
         ) : (
           filteredLogs.map((log) => {

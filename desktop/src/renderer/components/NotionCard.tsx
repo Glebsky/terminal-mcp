@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type FC } from "react";
 import { Check, Copy, Key, Link2, Sparkles, AlertCircle, Globe, Eye, EyeOff, Server } from "lucide-react";
 import { tunnelProviderLabels, type ServerStatus } from "../../types";
+import { useI18n } from "../i18n";
 
 interface NotionCardProps {
   status: ServerStatus;
 }
 
 export const NotionCard: FC<NotionCardProps> = ({ status }) => {
+  const { t } = useI18n();
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [showToken, setShowToken] = useState(false);
 
@@ -26,7 +28,7 @@ export const NotionCard: FC<NotionCardProps> = ({ status }) => {
       setCopyError(""); setCopiedField(fieldName);
       if (copyTimer.current) clearTimeout(copyTimer.current);
       copyTimer.current = setTimeout(() => setCopiedField(null), 2000);
-    } catch { setCopyError("Clipboard is unavailable. Select the displayed value and copy it manually."); }
+    } catch { setCopyError(t("endpoints.clipboardError")); }
   };
 
   const isLive = status.state === "running";
@@ -43,20 +45,20 @@ export const NotionCard: FC<NotionCardProps> = ({ status }) => {
             <Sparkles className="w-4 h-4 text-cyan-400" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white tracking-wide">MCP Endpoints</h3>
-            <p className="text-xs text-slate-400">Endpoints and authentication tokens for AI agents</p>
+            <h3 className="text-sm font-bold text-white tracking-wide">{t("endpoints.title")}</h3>
+            <p className="text-xs text-slate-400">{t("endpoints.subtitle")}</p>
           </div>
         </div>
 
         {status.tunnelUrl && isLive ? (
           <span className="endpoint-badge" data-state={status.tunnelState}>
             <span className="endpoint-status-dot" />
-            {providerLabel} · {status.tunnelState === "unverified" ? "Unverified" : "Connected"}
+            {providerLabel} · {status.tunnelState === "unverified" ? t("tunnel.state.unverified") : t("tunnel.state.connected")}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-500/10 border border-amber-500/20 text-amber-400 font-mono">
             <AlertCircle className="w-3.5 h-3.5" />
-            {status.state === "offline" || status.state === "error" ? "Server offline" : status.tunnelState === "error" ? `${providerLabel}: error` : status.tunnelState === "starting" ? `${providerLabel}: connecting` : "Local only"}
+            {status.state === "offline" || status.state === "error" ? t("endpoints.serverOffline") : status.tunnelState === "error" ? t("endpoints.providerError", { provider: providerLabel }) : status.tunnelState === "starting" ? t("endpoints.providerConnecting", { provider: providerLabel }) : t("endpoints.localOnly")}
           </span>
         )}
       </div>
@@ -68,7 +70,7 @@ export const NotionCard: FC<NotionCardProps> = ({ status }) => {
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
               <Link2 className="w-3 h-3 text-cyan-400" />
-              Public MCP URL
+              {t("endpoints.publicUrl")}
             </span>
             <button
               onClick={() => copyToClipboard(publicMcpUrl, "publicMcpUrl")}
@@ -78,20 +80,20 @@ export const NotionCard: FC<NotionCardProps> = ({ status }) => {
               {copiedField === "publicMcpUrl" ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400 font-medium">Copied!</span>
+                  <span className="text-emerald-400 font-medium">{t("endpoints.copied")}</span>
                 </>
               ) : (
                 <>
                   <Copy className="w-3.5 h-3.5" />
-                  <span>Copy</span>
+                  <span>{t("endpoints.copy")}</span>
                 </>
               )}
             </button>
           </div>
           <div className="font-mono text-xs text-slate-200 truncate bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-white/5 select-all">
             {isLive
-              ? publicMcpUrl || status.tunnelError || (status.tunnelState === "starting" ? "Connecting tunnel…" : "No public tunnel")
-              : "Server offline. Start server to get URL."}
+              ? publicMcpUrl || status.tunnelError || (status.tunnelState === "starting" ? t("endpoints.connectingTunnel") : t("endpoints.noTunnel"))
+              : t("endpoints.offlineUrl")}
           </div>
         </div>
 
@@ -100,7 +102,7 @@ export const NotionCard: FC<NotionCardProps> = ({ status }) => {
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
               <Server className="w-3 h-3 text-sky-400" />
-              Local MCP URL
+              {t("endpoints.localUrl")}
             </span>
             <button
               onClick={() => copyToClipboard(localMcpUrl, "localMcpUrl")}
@@ -110,12 +112,12 @@ export const NotionCard: FC<NotionCardProps> = ({ status }) => {
               {copiedField === "localMcpUrl" ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400 font-medium">Copied!</span>
+                  <span className="text-emerald-400 font-medium">{t("endpoints.copied")}</span>
                 </>
               ) : (
                 <>
                   <Copy className="w-3.5 h-3.5" />
-                  <span>Copy</span>
+                  <span>{t("endpoints.copy")}</span>
                 </>
               )}
             </button>
@@ -131,14 +133,14 @@ export const NotionCard: FC<NotionCardProps> = ({ status }) => {
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                 <Key className="w-3 h-3 text-emerald-400" />
-                Raw Token (No "Bearer")
+                {t("endpoints.rawToken")}
               </span>
               <button
                 type="button"
                 onClick={() => setShowToken(!showToken)}
                 className="text-slate-500 hover:text-slate-300 transition-colors"
-                title={showToken ? "Hide token" : "Show token"}
-                aria-label={showToken ? "Hide token" : "Show token"}
+                title={showToken ? t("endpoints.hideToken") : t("endpoints.showToken")}
+                aria-label={showToken ? t("endpoints.hideToken") : t("endpoints.showToken")}
               >
                 {showToken ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
               </button>
@@ -151,12 +153,12 @@ export const NotionCard: FC<NotionCardProps> = ({ status }) => {
               {copiedField === "rawKey" ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400 font-medium">Copied!</span>
+                  <span className="text-emerald-400 font-medium">{t("endpoints.copied")}</span>
                 </>
               ) : (
                 <>
                   <Copy className="w-3.5 h-3.5" />
-                  <span>Copy Token</span>
+                  <span>{t("endpoints.copyToken")}</span>
                 </>
               )}
             </button>
@@ -166,7 +168,7 @@ export const NotionCard: FC<NotionCardProps> = ({ status }) => {
               ? showToken
                 ? status.apiKey
                 : "•".repeat(24) + status.apiKey.slice(-8)
-              : "No token configured"}
+              : t("endpoints.noToken")}
           </div>
         </div>
 
@@ -175,7 +177,7 @@ export const NotionCard: FC<NotionCardProps> = ({ status }) => {
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
               <Key className="w-3 h-3 text-violet-400" />
-              Full Authorization Header
+              {t("endpoints.header")}
             </span>
             <button
               onClick={() => copyToClipboard(`Bearer ${status.apiKey}`, "header")}
@@ -185,12 +187,12 @@ export const NotionCard: FC<NotionCardProps> = ({ status }) => {
               {copiedField === "header" ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400 font-medium">Copied!</span>
+                  <span className="text-emerald-400 font-medium">{t("endpoints.copied")}</span>
                 </>
               ) : (
                 <>
                   <Copy className="w-3.5 h-3.5" />
-                  <span>Copy Header</span>
+                  <span>{t("endpoints.copyHeader")}</span>
                 </>
               )}
             </button>
@@ -200,20 +202,20 @@ export const NotionCard: FC<NotionCardProps> = ({ status }) => {
               ? showToken
                 ? `Bearer ${status.apiKey}`
                 : `Bearer ${"•".repeat(20)}${status.apiKey.slice(-8)}`
-              : "No token configured"}
+              : t("endpoints.noToken")}
           </div>
         </div>
       </div>
 
       {copyError && <p role="alert" className="endpoint-warning">{copyError}</p>}
       {status.tunnelError && <p role="alert" className="endpoint-warning">{status.tunnelError}</p>}
-      {status.tunnelUrl && <p className="text-xs text-slate-400">Public address assigned by {providerLabel}. An external MCP connection has not been verified; use Authorization: Bearer with your MCP key.</p>}
+      {status.tunnelUrl && <p className="text-xs text-slate-400">{t("endpoints.publicNote", { provider: providerLabel })}</p>}
       {/* Public tunnel address */}
       {status.tunnelUrl && (
         <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-950/40 border border-white/5 text-xs">
           <div className="flex items-center gap-2 text-slate-400">
             <Globe className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span className="text-[11px]">{providerLabel} Base Domain:</span>
+            <span className="text-[11px]">{t("endpoints.baseDomain", { provider: providerLabel })}</span>
             <span className="font-mono text-slate-300 select-all">{tunnelBaseUrl}</span>
           </div>
           <button
@@ -221,9 +223,9 @@ export const NotionCard: FC<NotionCardProps> = ({ status }) => {
             className="flex items-center gap-1 text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
           >
             {copiedField === "ngrokBase" ? (
-              <span className="text-emerald-400">Copied</span>
+              <span className="text-emerald-400">{t("endpoints.copiedShort")}</span>
             ) : (
-              <span>Copy Domain</span>
+              <span>{t("endpoints.copyDomain")}</span>
             )}
           </button>
         </div>

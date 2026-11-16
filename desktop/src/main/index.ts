@@ -95,6 +95,15 @@ function createWindow() {
     },
   });
 
+  // The app window only shows the bundled UI: no pop-ups and no navigation elsewhere.
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    const allowed = isDev
+      ? url.startsWith(process.env.VITE_DEV_SERVER_URL || "http://localhost:5173")
+      : url.startsWith("file://");
+    if (!allowed) event.preventDefault();
+  });
+
   if (isDev) {
     void mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL || "http://localhost:5173");
   } else {

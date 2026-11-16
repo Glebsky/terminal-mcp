@@ -1,7 +1,6 @@
-// Generates the app icons from the SVG artwork in this folder:
-//   icon.svg     detailed artwork, used from 48 px up and for icon.png
-//   icon-32.svg  simplified artwork for 24-40 px
-//   icon-16.svg  pixel-aligned artwork for 16-20 px
+﻿// Generates the app icons from the SVG artwork in this folder:
+//   icon-32.svg  the same artwork as the logo in the app title bar. It is used for every
+//                size, so the shortcut, Start menu, taskbar and tray icons match it exactly.
 // Output: icon.ico (window, taskbar, tray and .exe icon on Windows) and icon.png (512 px).
 // Run with: npm run icons
 "use strict";
@@ -19,15 +18,15 @@ if (!app) {
 const dir = __dirname;
 const pngSize = 512;
 const icoEntries = [
-  [16, "icon-16.svg"],
-  [20, "icon-16.svg"],
+  [16, "icon-32.svg"],
+  [20, "icon-32.svg"],
   [24, "icon-32.svg"],
   [32, "icon-32.svg"],
   [40, "icon-32.svg"],
-  [48, "icon.svg"],
-  [64, "icon.svg"],
-  [128, "icon.svg"],
-  [256, "icon.svg"],
+  [48, "icon-32.svg"],
+  [64, "icon-32.svg"],
+  [128, "icon-32.svg"],
+  [256, "icon-32.svg"],
 ];
 // Entries up to this size are stored as 32-bit BMP for the widest Windows support; larger ones as PNG.
 const maxBmpSize = 64;
@@ -117,7 +116,7 @@ app
       images.push({ size, data: asBmp ? toBmp(size, rgba) : Buffer.from(png, "base64") });
     }
     fs.writeFileSync(path.join(dir, "icon.ico"), toIco(images));
-    const { png } = await render("icon.svg", pngSize, false);
+    const { png } = await render("icon-32.svg", pngSize, false);
     fs.writeFileSync(path.join(dir, "icon.png"), Buffer.from(png, "base64"));
     console.log("icon.ico: " + icoEntries.map(([size]) => size).join(", ") + " px");
     console.log("icon.png: " + pngSize + " px");
