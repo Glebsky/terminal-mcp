@@ -8,7 +8,8 @@
   button:disabled { cursor: not-allowed; }
   button:focus-visible, input:focus-visible { outline: 2px solid #8ce4f0; outline-offset: 2px; }
 }
-.app-shell { position:relative; width:100vw; height:100vh; display:flex; flex-direction:column; overflow:hidden; color:#e8f1ff; background:#0a1022; border:1px solid rgba(205,230,255,.15); border-radius:14px; isolation:isolate; }
+.app-shell { position:relative; width:100vw; height:100vh; display:flex; flex-direction:column; overflow:hidden; color:#e8f1ff; background:#0a1022; border:1px solid rgba(205,230,255,.15); border-radius:14px; isolation:isolate; animation:app-window-enter .45s cubic-bezier(.16,1,.3,1) backwards; }
+@keyframes app-window-enter { from { opacity:0; transform:scale(.985) translateY(6px); } to { opacity:1; transform:scale(1) translateY(0); } }
 .app-shell:before { content:""; position:absolute; inset:0; z-index:-2; background:linear-gradient(135deg,#101932 0%,#162648 40%,#171735 73%,#0d202c 100%); }
 .aurora { position:absolute; z-index:-1; width:58%; height:70%; filter:blur(85px); opacity:.42; pointer-events:none; animation:drift 38s ease-in-out infinite alternate; will-change:transform; }
 .aurora-one { background:#315c9b; top:-38%; left:-12%; }
@@ -30,6 +31,8 @@
 .monitor-toggle { display:flex; align-items:center; gap:7px; color:#bad4e9; font-size:11px; font-weight:600; padding:8px 11px; border:1px solid rgba(202,230,255,.14); border-radius:9px; background:rgba(22,38,61,.52); }
 .monitor-toggle:hover { background:rgba(111,169,206,.18); }
 .workspace-body { flex:1; min-height:270px; display:flex; flex-direction:column; }
+.workspace-body > * { animation:tab-enter .32s cubic-bezier(.16,1,.3,1); }
+@keyframes tab-enter { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 /* SPEC-002 FR-2: the panel grows with its content; .dashboard is the only scroll area. */
 .monitor-panel { display:flex; flex-direction:column; gap:13px; border-radius:16px; padding:16px; flex:1 0 auto; }
 .monitor-heading,.pipe-caption,.clients-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; }

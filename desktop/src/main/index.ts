@@ -82,6 +82,7 @@ function createWindow() {
     height: 740,
     minWidth: 860,
     minHeight: 600,
+    show: false,
     frame: false,
     transparent: true,
     backgroundColor: "#00000000",
@@ -93,6 +94,12 @@ function createWindow() {
       contextIsolation: true,
       sandbox: false,
     },
+  });
+
+  mainWindow.once("ready-to-show", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+    }
   });
 
   // The app window only shows the bundled UI: no pop-ups and no navigation elsewhere.

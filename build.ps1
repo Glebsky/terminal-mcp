@@ -15,18 +15,46 @@ function Show-Header {
     Write-Host ""
 }
 
-function Build-Project {
-    Write-Host "`n[1/2] Компиляция проекта (TypeScript + Vite)..." -ForegroundColor Yellow
-    npm run build
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "`n[ОШИБКА] Компиляция TypeScript/Vite завершилась с ошибкой!" -ForegroundColor Red
-        return $false
+function Ensure-Dependencies {
+    $modulesPath = Join-Path $PSScriptRoot "node_modules"
+    if (-not (Test-Path -LiteralPath $modulesPath)) {
+        Write-Host "`n[Инфо] node_modules не найден. Установка зависимостей (npm install)..." -ForegroundColor Yellow
+        & cmd.exe /c "npm install"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "`n[ОШИБКА] Ошибка при выполнении npm install!" -ForegroundColor Red
+            return $false
+        }
+    }
+    $electronDist = Join-Path $PSScriptRoot "node_modules\electron\dist"
+    if (-not (Test-Path -LiteralPath $electronDist)) {
+        Write-Host "`n[Инфо] Загрузка бинарных файлов Electron..." -ForegroundColor Yellow
+        & node (Join-Path $PSScriptRoot "node_modules\electron\install.js")
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "`n[ОШИБКА] Ошибка при установке бинарных файлов Electron!" -ForegroundColor Red
+            return $false
+        }
     }
     return $true
 }
 
+function Build-Project {
+    $script:BuildOk = $false
+    if (-not (Ensure-Dependencies)) {
+        return
+    }
+
+    Write-Host "`n[1/2] Компиляция проекта (TypeScript + Vite)..." -ForegroundColor Yellow
+    & cmd.exe /c "npm run build"
+    if ($LASTEXITCODE -eq 0) {
+        $script:BuildOk = $true
+    } else {
+        Write-Host "`n[ОШИБКА] Компиляция TypeScript/Vite завершилась с ошибкой!" -ForegroundColor Red
+    }
+}
+
 function Do-Portable {
-    if (-not (Build-Project)) { return }
+    Build-Project
+    if (-not $script:BuildOk) { return }
     Write-Host "`n[2/2] Упаковка в Portable.exe..." -ForegroundColor Yellow
     npx electron-builder --win portable
     if ($LASTEXITCODE -eq 0) {
@@ -39,7 +67,8 @@ function Do-Portable {
 }
 
 function Do-Installer {
-    if (-not (Build-Project)) { return }
+    Build-Project
+    if (-not $script:BuildOk) { return }
     Write-Host "`n[2/2] Создание инсталлятора (Setup.exe)..." -ForegroundColor Yellow
     npx electron-builder --win nsis
     if ($LASTEXITCODE -eq 0) {
@@ -52,7 +81,8 @@ function Do-Installer {
 }
 
 function Do-All {
-    if (-not (Build-Project)) { return }
+    Build-Project
+    if (-not $script:BuildOk) { return }
     Write-Host "`n[2/2] Упаковка всех вариантов (Portable + Setup)..." -ForegroundColor Yellow
     npx electron-builder --win
     if ($LASTEXITCODE -eq 0) {
@@ -65,7 +95,8 @@ function Do-All {
 }
 
 function Do-Dir {
-    if (-not (Build-Project)) { return }
+    Build-Project
+    if (-not $script:BuildOk) { return }
     Write-Host "`n[2/2] Распаковка приложения в папку release\win-unpacked..." -ForegroundColor Yellow
     npx electron-builder --win --dir
     if ($LASTEXITCODE -eq 0) {

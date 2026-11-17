@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Authenticated remote MCP server exposing terminal and filesystem tools to AI agents.",
+  "author": "MCP Terminal",
   "main": "dist-desktop/main/index.js",
   "scripts": {
     "build:server": "tsc -p tsconfig.json",
@@ -53,7 +54,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "concurrently": "^10.0.5",
-    "electron": "^45.2.3",
+    "electron": "45.2.3",
     "electron-builder": "^26.15.3",
     "lucide-react": "^1.55.0",
     "react": "^19.2.8",
