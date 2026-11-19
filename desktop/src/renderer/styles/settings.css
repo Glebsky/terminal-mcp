@@ -102,6 +102,8 @@
   :root:not(.dark) .app-shell .workspace-tabs button[aria-selected=true] { color:hsl(var(--primary)); background:hsl(var(--primary)/.1); }
   :root:not(.dark) .app-shell .monitor-live { color:hsl(var(--success)); }
   :root:not(.dark) .app-shell :is(.pipe-caption span:last-child,.clients-heading span:last-child,.pipe-caption em,.flow-legend b) { color:hsl(var(--muted-foreground)); }
+  /* SPEC-003: the section follows the light surface; the flow pipe stays a dark instrument window so the band keeps its glow. */
+  :root:not(.dark) .app-shell .pipe-section { background:hsl(var(--card)/.55); border-color:hsl(var(--border)/.7); box-shadow:none; }
 }
 
 /* MCP tool toggles */

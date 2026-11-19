@@ -79,7 +79,7 @@ export const uk: Record<MessageKey, string> = {
   "monitor.total": "усього {value}",
   "monitor.dataFlow": "ПОТІК ДАНИХ",
   "monitor.payloads": "автентифіковані MCP-дані",
-  "monitor.perParticle": "≈ {size} на частинку · остання секунда",
+  "monitor.throughput": "{size}/с сумарно · остання секунда",
   "monitor.pipeAria": "Вхідний {rx} за секунду, вихідний {tx} за секунду",
   "monitor.inboundEdge": "Вхідний: клієнт → сервер",
   "monitor.outboundEdge": "Вихідний: сервер → клієнт",

@@ -387,3 +387,42 @@ Close the active browser instance and all tabs.
 - **Form Submissions & Interaction**: Use `browser_type` to fill in inputs and `browser_click` to click buttons.
 - **Visual Verification**: Use `browser_screenshot` to confirm layouts, styles, and responsive design.
 - **Cleanup**: Call `browser_close` once your testing session is complete.
+
+---
+
+## 5. Working on This Repository (Coding Agents)
+
+Rules for agents that change the code of MCP Terminal itself (server, Electron shell, desktop UI).
+
+### 5.1 Layout
+- `src/`: headless MCP server (Node.js, Express, ESM, `tsconfig.json`). Tools live in `src/tools/`, registrations in `src/tools/index.ts`.
+- `desktop/src/main/`: Electron main process, preload and server manager (`tsconfig.electron.json`).
+- `desktop/src/renderer/`: React 19 + Tailwind 4 UI (`tsconfig.desktop.json`, Vite root is `desktop/`).
+  - `components/Monitor.tsx`: connection monitor. `components/flow/`: DATA FLOW band (`flowRibbonEngine.ts` canvas engine without React, `FlowRibbon.tsx` wrapper, `EasedValue.tsx` eased counters).
+  - `i18n/en.ts` is the reference dictionary: its keys type `uk.ts` and `ru.ts`, so every new key goes into all three files.
+  - `styles/liquid-glass.css`: dark glass base styles. `styles/settings.css`: settings and light-theme overrides. `appTheme.css`: colour tokens.
+- `desktop/preview/flow.html`: dev-only bench for the data flow band (not part of the app bundle).
+- `docs/specs/SPEC-NNN-*.md`: feature specifications (Russian): context, requirements (FR), design, task list, acceptance criteria.
+
+### 5.2 Commands
+| Task | Command |
+|---|---|
+| Type-check server, desktop UI and Electron | `npm run check` |
+| Build the renderer | `npm run build:renderer` |
+| Full build | `npm run build` |
+| Desktop dev mode (Vite on 5173 + Electron) | `npm run app:dev` |
+| Monitor server test | `npm run test:monitor` |
+| Data flow band bench | `npx vite --port 5174`, open `http://localhost:5174/preview/flow.html#heavy` (scenarios: `idle`, `trickle`, `steady`, `bursts`, `heavy`, `upload`, `offline`) |
+
+Run `npm run check` and `npm run build:renderer` before every commit that touches `desktop/`.
+
+### 5.3 Conventions
+- **Spec first.** UI or behaviour features get a `docs/specs/SPEC-NNN` file (or an update of an existing one). Keep the task checkboxes current and mark superseded requirements instead of deleting them.
+- **Motion.** Every animated element respects the `animation` prop (`interfaceMotion`) and `prefers-reduced-motion`, and has a static fallback. CSS animations are switched off under `.motion-off` (except `.functional-motion`).
+- **Per-frame work** goes to canvas or CSS custom properties, never to React state at 60 fps. Write CSS variables only when the value actually changes.
+- **Data flow band colours:** `#3cc8ff -> #4a92ff -> #6a6dff -> #b26bff`. Keep `BAND_STOPS` in `flowRibbonEngine.ts` and `.flow-direction-*` in `liquid-glass.css` in sync.
+- **Tunable constants** of the band (`FULL_SCALE_BYTES`, `CROSSING_SECONDS`, `ATTACK_SECONDS`, `RELEASE_SECONDS`, `STALE_MS`, `IDLE_PEAK`) are documented in SPEC-003; update the spec when you change them.
+- **Commits** follow Conventional Commits: `feat(desktop): ...`, `fix(auth): ...`, `docs: ...`.
+- **Line endings** are normalised by Git (LF in the index, CRLF in the Windows working tree); do not convert files by hand.
+- **Verify edits.** After `file_replace` or `file_write`, re-read the changed region or run the type-check. Pay extra attention to files with non-ASCII text (i18n dictionaries, Russian docs).
+- Do not commit local artefacts: `.env`, screenshots, `*.bak`, logs, `dist*/`, `release/`.

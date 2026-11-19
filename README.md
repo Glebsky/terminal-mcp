@@ -266,6 +266,14 @@ notion-terminal-mcp/
 
 ---
 
+## Connection Monitor
+
+The **Monitor** tab shows recent clients, open SSE streams, active HTTP requests, request totals and inbound / outbound payload rates (authenticated MCP message bodies only, HTTP headers excluded).
+
+**Data flow band** ([SPEC-003](docs/specs/SPEC-003-data-flow-band.md)): one blue to violet band whose thickness follows the payload volume of the last second on a log scale, from a thin thread for a few bytes to full width at about 4 MiB/s. Inbound swells travel left to right, outbound right to left, with light packets riding on top. Changes are eased; when traffic stops the band fades out smoothly and the "Waiting for traffic" caption fades in. With **Interface animations** off (or system Reduced Motion) the band is drawn statically.
+
+Monitor test: `npm run test:monitor`. Visual bench for the band: `npx vite --port 5174`, then open `http://localhost:5174/preview/flow.html#heavy`.
+
 ## Windows Batch & PowerShell Build Scripts
 
 For fast execution without remembering npm commands:

@@ -79,7 +79,7 @@ export const ru: Record<MessageKey, string> = {
   "monitor.total": "всего {value}",
   "monitor.dataFlow": "ПОТОК ДАННЫХ",
   "monitor.payloads": "аутентифицированные MCP-данные",
-  "monitor.perParticle": "≈ {size} на частицу · последняя секунда",
+  "monitor.throughput": "{size}/с суммарно · последняя секунда",
   "monitor.pipeAria": "Входящий {rx} в секунду, исходящий {tx} в секунду",
   "monitor.inboundEdge": "Входящий: клиент → сервер",
   "monitor.outboundEdge": "Исходящий: сервер → клиент",

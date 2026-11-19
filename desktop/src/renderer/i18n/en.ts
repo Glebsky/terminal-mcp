@@ -78,7 +78,7 @@ export const en = {
   "monitor.total": "total {value}",
   "monitor.dataFlow": "DATA FLOW",
   "monitor.payloads": "authenticated MCP payloads",
-  "monitor.perParticle": "≈ {size} per particle · last second",
+  "monitor.throughput": "{size}/s total · last second",
   "monitor.pipeAria": "Inbound {rx} per second, outbound {tx} per second",
   "monitor.inboundEdge": "Inbound: client → server",
   "monitor.outboundEdge": "Outbound: server → client",
