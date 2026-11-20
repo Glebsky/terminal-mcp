@@ -13,7 +13,7 @@ export const en = {
   "titlebar.minimize": "Minimize to taskbar",
   "titlebar.tray": "Minimize to tray (hide from taskbar)",
   "titlebar.maximize": "Maximize",
-  "titlebar.close": "Close (minimize to tray)",
+  "titlebar.close": "Close (stop the server and quit)",
 
   "controls.starting": "Starting MCP…",
   "controls.start": "Start Server",

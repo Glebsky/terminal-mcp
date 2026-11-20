@@ -14,7 +14,7 @@ export const ru: Record<MessageKey, string> = {
   "titlebar.minimize": "Свернуть на панель задач",
   "titlebar.tray": "Свернуть в трей (скрыть с панели задач)",
   "titlebar.maximize": "Развернуть",
-  "titlebar.close": "Закрыть (свернуть в трей)",
+  "titlebar.close": "Закрыть (остановить сервер и выйти)",
 
   "controls.starting": "Запуск MCP…",
   "controls.start": "Запустить сервер",

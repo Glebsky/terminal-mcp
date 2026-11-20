@@ -14,7 +14,7 @@ export const uk: Record<MessageKey, string> = {
   "titlebar.minimize": "Згорнути на панель завдань",
   "titlebar.tray": "Згорнути в трей (сховати з панелі завдань)",
   "titlebar.maximize": "Розгорнути",
-  "titlebar.close": "Закрити (згорнути в трей)",
+  "titlebar.close": "Закрити (зупинити сервер і вийти)",
 
   "controls.starting": "Запуск MCP…",
   "controls.start": "Запустити сервер",

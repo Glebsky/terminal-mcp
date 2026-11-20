@@ -29,6 +29,7 @@ let shutdownComplete = false;
 let hasShownTrayNotification = false;
 
 function showMainWindow() {
+  if (isQuitting) return; // shutting down: do not bring the window back
   if (!mainWindow || mainWindow.isDestroyed()) {
     createWindow();
     return;
@@ -61,6 +62,7 @@ function hideMainWindow() {
 }
 
 function toggleMainWindow() {
+  if (isQuitting) return;
   if (!mainWindow || mainWindow.isDestroyed()) {
     createWindow();
     return;
@@ -74,6 +76,16 @@ function toggleMainWindow() {
   } else {
     showMainWindow();
   }
+}
+
+/**
+ * Exits for real: the window disappears at once, before-quit stops the MCP server
+ * (if it is running) and the app ends once its port and tunnel are released.
+ */
+function quitApp() {
+  isQuitting = true;
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+  app.quit();
 }
 
 function createWindow() {
@@ -118,12 +130,12 @@ function createWindow() {
     void mainWindow.loadFile(htmlPath);
   }
 
-  // Intercept window close to minimize to tray instead of quitting
+  // Closing the window (title-bar X, Alt+F4, taskbar) quits the app and stops the server (SPEC-004).
+  // Hiding to the tray is a separate action: the tray button in the title bar or the tray menu.
   mainWindow.on("close", (event) => {
     if (!isQuitting) {
       event.preventDefault();
-      hideMainWindow();
-      return false;
+      quitApp();
     }
   });
 
@@ -216,10 +228,7 @@ function updateTrayMenu(status?: ServerStatus) {
     { type: "separator" },
     {
       label: "Выход из приложения",
-      click: () => {
-        isQuitting = true;
-        app.quit();
-      },
+      click: () => quitApp(),
     },
   );
 
@@ -365,8 +374,9 @@ if (!gotTheLock) {
     }
   });
 
+  // Title-bar X: stop the server and quit. The tray button next to it keeps the app running.
   ipcMain.on("window:close", () => {
-    mainWindow?.close();
+    quitApp();
   });
 
   ipcMain.on("window:hide-to-tray", () => {
@@ -374,8 +384,7 @@ if (!gotTheLock) {
   });
 
   ipcMain.on("app:quit", () => {
-    isQuitting = true;
-    app.quit();
+    quitApp();
   });
 
   ipcMain.on("shell:open-external", (_event, url) => {
