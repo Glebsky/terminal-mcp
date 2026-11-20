@@ -4,6 +4,7 @@ import * as fs from "node:fs/promises";
 import * as crypto from "node:crypto";
 import dotenv from "dotenv";
 import type { EnvConfig, LogEntry, ServerStatus, MonitorSnapshot } from "../types.js";
+import { createLineBuffer } from "./line-buffer.js";
 /** Must match the server's acknowledgement phrase for AUTH_METHODS=none. */
 const NO_AUTH_ACK = "I_UNDERSTAND_ANYONE_CAN_CONTROL_THIS_PC";
 
@@ -328,6 +329,14 @@ export class ServerManager {
 
       this.process.on("message", (message: unknown) => {
         if (message && typeof message === "object" && (message as {type?: string}).type === "server:ready") this.updateStatus({ state: "running" });
+        if (message && typeof message === "object" && (message as {type?: string}).type === "server:error") {
+          const m = message as { code?: string; port?: number; message?: string };
+          const error = m.code === "EADDRINUSE"
+            ? `Port ${m.port} is already in use by another process. Stop it or choose another port in Settings.`
+            : `Server could not start: ${m.code || "error"} ${m.message || ""}`.trim();
+          this.updateStatus({ state: "error", error });
+          this.emitLog(error, "error");
+        }
         if (message && typeof message === "object" && (message as {type?: string}).type === "tunnel:status") {
           const m = message as {provider: ServerStatus["tunnelProvider"]; state: ServerStatus["tunnelState"]; url?: string; error?: string};
           this.updateStatus({ tunnelProvider: m.provider, tunnelState: m.state, tunnelUrl: m.url, tunnelError: m.error, ngrokUrl: m.provider === "ngrok" ? m.url : undefined });
@@ -338,21 +347,26 @@ export class ServerManager {
       });
       if (this.process.connected) this.process.send({ type: "monitor:set", enabled: this.monitoringEnabled });
 
-      this.process.stdout?.on("data", (chunk: Buffer) => {
-        const text = chunk.toString("utf8");
-        this.parseOutput(text);
-      });
+      // Pipe chunks split lines and UTF-8 characters anywhere: decode as a stream (setEncoding uses a
+      // StringDecoder) and pass on only whole lines; stderr lines of one chunk stay one entry (SPEC-006 FR-6).
+      const stdoutLines = createLineBuffer((text) => this.parseOutput(text));
+      this.process.stdout?.setEncoding("utf8");
+      this.process.stdout?.on("data", (chunk: string) => stdoutLines.push(chunk));
+      this.process.stdout?.on("end", () => stdoutLines.flush());
 
-      this.process.stderr?.on("data", (chunk: Buffer) => {
-        const text = chunk.toString("utf8");
-        this.emitLog(text.trim(), "error", undefined, text);
+      const stderrLines = createLineBuffer((text) => {
+        if (text.trim()) this.emitLog(text.trim(), "error", undefined, text);
       });
+      this.process.stderr?.setEncoding("utf8");
+      this.process.stderr?.on("data", (chunk: string) => stderrLines.push(chunk));
+      this.process.stderr?.on("end", () => stderrLines.flush());
 
       this.process.on("close", (code) => {
         const wasRunning = this.status.state === "running" || this.status.state === "starting";
         this.process = null;
         this.updateStatus({
-          state: code === 0 || !wasRunning ? "offline" : "error",
+          // A startup error reported over IPC (server:error) stays visible after the exit.
+          state: this.status.state === "error" || (code !== 0 && wasRunning) ? "error" : "offline",
           ngrokUrl: undefined, tunnelUrl: undefined, tunnelState: "disabled", tunnelError: undefined,
         });
         this.emitLog(`MCP Server stopped (exit code: ${code})`, code === 0 ? "info" : "warn");

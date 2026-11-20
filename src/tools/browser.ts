@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { auditLog } from "../utils/logger.js";
 import { resolveTarget } from "./filesystem.js";
 import { config } from "../config.js";
+import { pageText } from "../utils/text.js";
 
 export interface BrowserOpenOptions {
   url: string;
@@ -40,11 +41,17 @@ export interface BrowserTypeOptions {
 export interface BrowserGetContentOptions {
   type?: "text" | "html" | "title";
   selector?: string;
+  /** First UTF-16 index to return (continue from next_offset). */
+  offset?: number;
+  /** Maximum number of UTF-16 characters to return. */
+  length?: number;
 }
 
 export interface BrowserScreenshotOptions {
   path?: string;
   fullPage?: boolean;
+  /** Working directory of the calling session for a relative `path`. */
+  cwd?: string;
 }
 
 export interface ConsoleLogMessage {
@@ -517,17 +524,16 @@ export class BrowserManager {
       }
     }
 
-    const truncated = content.length > config.maxOutputBytes;
-    const data = truncated ? content.slice(0, config.maxOutputBytes) : content;
+    // MAX_OUTPUT_BYTES is a byte limit; pages never split a character, and the caller continues
+    // from next_offset (UTF-16 indices, as in JavaScript). SPEC-006 FR-4.
+    const slice = pageText(content, options.offset ?? 0, options.length, config.maxOutputBytes);
 
-    auditLog("BROWSER_GET_CONTENT", { type, selector, length: data.length, truncated });
+    auditLog("BROWSER_GET_CONTENT", { type, selector, offset: slice.offset, length: slice.length, truncated: slice.truncated });
 
     return {
       type,
       selector: selector || (type === "html" ? "html" : "body"),
-      content: data,
-      length: data.length,
-      truncated,
+      ...slice,
     };
   }
 
@@ -546,7 +552,7 @@ export class BrowserManager {
     let savedPath: string | undefined;
 
     if (outputPath) {
-      savedPath = resolveTarget(outputPath);
+      savedPath = resolveTarget(outputPath, { cwd: options.cwd, mutating: true });
       await fs.mkdir(path.dirname(savedPath), { recursive: true });
       await fs.writeFile(savedPath, buffer);
     }

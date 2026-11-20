@@ -185,7 +185,7 @@ Click **Settings (.env)** to configure server options visually:
 
 ### System Tray:
 - **Minimize to Tray**: The minimize button (`ArrowDownToLine`) hides the window from the Windows taskbar.
-- **Close Button (`X`)**: Closes the window to the tray while keeping the server running in the background.
+- **Close Button (`X`)**: Stops the MCP server (if it is running) and quits the app. Alt+F4 and closing from the taskbar do the same. To keep the server running in the background, use Minimize to Tray instead.
 - **Tray Menu (Right Click)**: Toggle window visibility, view live server status, open Ngrok URL, start/stop/restart server, or exit completely.
 
 ---
@@ -259,11 +259,11 @@ The server supports both Model Context Protocol connection methods:
 ### 📁 2. Filesystem Operations
 | Tool | Description | Parameters |
 |---|---|---|
-| `file_search` | Search files by glob pattern (`*.ts`) and/or search content with regex/text grep | `path`, `pattern`, `query`, `case_sensitive`, `max_results` (max: 1,000) |
+| `file_search` | Search files by glob pattern (`*.ts`) and/or search content with regex/text grep; files it could not search are listed in `skipped` | `path`, `pattern`, `query`, `case_sensitive`, `max_results` (max: 1,000) |
 | `file_replace` | Safely replace an exact block of code or text in a file without rewriting the entire file | `path`, `target`, `replacement`, `allow_multiple` |
 | `file_read` | Read UTF-8 text or Base64 binary files with offset pagination for large files | `path`, `encoding` (`utf8`/`base64`), `offset`, `length` |
 | `file_write` | Create, overwrite, or append content to files (creates missing parent directories) | `path`, `data`, `encoding`, `append` |
-| `file_list` | List directory contents recursively or flat with file sizes and metadata | `path`, `recursive`, `max_entries` (max: 10,000) |
+| `file_list` | List directory contents recursively or flat with file sizes and metadata | `path`, `recursive`, `max_entries` (max: 10,000), `offset` (continue from `next_offset`) |
 | `file_stat` | Inspect file/directory metadata (size, timestamps, mode) | `path` |
 | `file_mkdir` | Create directories and any missing parent directories recursively | `path` |
 | `file_move` | Move or rename files and directories with optional destination overwrite | `source`, `destination`, `overwrite` |
@@ -283,7 +283,7 @@ The server supports both Model Context Protocol connection methods:
 | `browser_evaluate` | Execute arbitrary JavaScript in the active page context and return JSON result | `script` |
 | `browser_click` | Click an element matching a CSS selector | `selector`, `timeout_ms` |
 | `browser_type` | Type text into an input or textarea element with optional field clearing | `selector`, `text`, `clear`, `timeout_ms` |
-| `browser_get_content` | Extract rendered text, raw DOM HTML, or page title | `type` (`text`/`html`/`title`), `selector` |
+| `browser_get_content` | Extract rendered text, raw DOM HTML, or page title | `type` (`text`/`html`/`title`), `selector`, `offset` / `length` (pages; continue from `next_offset`) |
 | `browser_screenshot` | Capture full-page or viewport screenshots to a PNG file or return base64 | `path`, `full_page` |
 | `browser_close` | Close active browser instance and release resources | *(none)* |
 
@@ -300,6 +300,8 @@ Detailed JSON schemas and specifications are available in [`AGENTS.md`](AGENTS.m
 
 #### Q: How does the agent switch between multiple projects?
 **A**: The agent can invoke `workspace_set_cwd(path: "frontend")` or `workspace_set_cwd(path: "backend")`. Subsequent filesystem operations and terminal commands will run in the selected subfolder using simple relative paths.
+
+Over SSE each connected agent has its own working directory, so two agents in different projects do not redirect each other's writes. Stateless `/mcp` clients share one. A relative write path that does not exist yet is created inside the working directory, never in `FILES_ROOT`.
 
 #### Q: Where is configuration stored when using `.exe`?
 **A**:

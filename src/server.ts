@@ -7,6 +7,7 @@ import { config } from "./config.js";
 import { authDescription, authenticate } from "./middleware/auth.js";
 import { validateHost } from "./middleware/host.js";
 import { registerAllTools } from "./tools/index.js";
+import { createSessionScope, globalScope, type WorkspaceScope } from "./tools/filesystem.js";
 import { monitorRequest, recordRequestBody, setSseCountProvider } from "./monitor.js";
 
 const SERVER_NAME = "notion-terminal-files";
@@ -29,13 +30,13 @@ setSseCountProvider(() => sseSessions.size);
 // Active Streamable HTTP transports for graceful shutdown
 const activeStreamableTransports = new Set<StreamableHTTPServerTransport>();
 
-export function createMcpServer(): McpServer {
+export function createMcpServer(scope: WorkspaceScope = globalScope): McpServer {
   const server = new McpServer({
     name: SERVER_NAME,
     version: SERVER_VERSION,
   });
 
-  registerAllTools(server);
+  registerAllTools(server, scope);
   return server;
 }
 
@@ -83,7 +84,8 @@ export function createApp(): Express {
   // Uses stateless mode (sessionIdGenerator: undefined) so clients can connect
   // directly without strict session validation errors (HTTP 400).
   app.all("/mcp", validateHost, authenticate, monitorRequest, async (req, res) => {
-    const server = createMcpServer();
+    // Stateless: every request gets a new server, so the working directory stays process-wide (SPEC-005 FR-2.3).
+    const server = createMcpServer(globalScope);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -118,7 +120,8 @@ export function createApp(): Express {
       return;
     }
 
-    const server = createMcpServer();
+    // One server per SSE session: its working directory belongs to this session only (SPEC-005 FR-2.2).
+    const server = createMcpServer(createSessionScope());
     const transport = new SSEServerTransport("/messages", res);
     const sessionId = transport.sessionId;
 

@@ -15,6 +15,8 @@ import {
   deletePath,
   getActiveWorkingDir,
   setActiveWorkingDir,
+  globalScope,
+  type WorkspaceScope,
 } from "./filesystem.js";
 import { browserManager } from "./browser.js";
 
@@ -22,10 +24,11 @@ import { browserManager } from "./browser.js";
  * Register every tool except those listed in DISABLED_TOOLS. Disabled tools are removed
  * right after registration, so they never appear in tools/list and cannot be called.
  */
-export function registerAllTools(server: McpServer): void {
+/** `scope` is the working directory of the session these tools serve (SPEC-005 FR-2). */
+export function registerAllTools(server: McpServer, scope: WorkspaceScope = globalScope): void {
   const disabled = config.disabledTools;
   if (disabled.size === 0) {
-    registerTools(server);
+    registerTools(server, scope);
     return;
   }
   const filtered = new Proxy(server, {
@@ -39,16 +42,16 @@ export function registerAllTools(server: McpServer): void {
       };
     },
   });
-  registerTools(filtered);
+  registerTools(filtered, scope);
 }
 
-function registerTools(server: McpServer): void {
+function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "terminal_execute",
     {
       title: "Execute a terminal command",
       description:
-        "Execute a PowerShell or cmd command on the host. This has unrestricted host privileges when FULL_ACCESS=true.",
+        "Execute a PowerShell or cmd command on the host. This has unrestricted host privileges when FULL_ACCESS=true. Output over MAX_OUTPUT_BYTES is cut at a character boundary (truncated: true); redirect long output to a file and read it with file_read.",
       inputSchema: {
         command: z.string().min(1).describe("The command to execute"),
         shell: z.enum(["powershell", "cmd"]).default("powershell").describe("Shell type to execute command in"),
@@ -62,9 +65,9 @@ function registerTools(server: McpServer): void {
           .describe("Command timeout in milliseconds (default: COMMAND_TIMEOUT_MS, max: 900000)"),
       },
     },
-    async ({ command, shell, cwd, timeout_ms }) => {
+    async ({ command, shell, cwd, timeout_ms }, extra) => {
       try {
-        const result = await executeCommand(command, shell, cwd, timeout_ms);
+        const result = await executeCommand(command, shell, cwd, timeout_ms, { scope, signal: extra.signal });
         return textResult(result, result.exitCode !== 0 || result.timedOut);
       } catch (error) {
         return errorResult(error);
@@ -76,7 +79,7 @@ function registerTools(server: McpServer): void {
     "file_read",
     {
       title: "Read a file",
-      description: "Read a text or binary file from the host filesystem.",
+      description: "Read a text or binary file from the host filesystem. UTF-8 chunks never split a character; while truncated is true, continue from next_offset.",
       inputSchema: {
         path: z.string().min(1).describe("Path to the file to read"),
         encoding: z.enum(["utf8", "base64"]).default("utf8").describe("File content encoding"),
@@ -92,7 +95,7 @@ function registerTools(server: McpServer): void {
     },
     async ({ path: inputPath, encoding, offset, length }) => {
       try {
-        const result = await readFile(inputPath, encoding, offset, length);
+        const result = await readFile(inputPath, encoding, offset, length, scope.get());
         return textResult(result);
       } catch (error) {
         return errorResult(error);
@@ -114,7 +117,7 @@ function registerTools(server: McpServer): void {
     },
     async ({ path: inputPath, data, encoding, append }) => {
       try {
-        const result = await writeFile(inputPath, data, encoding, append);
+        const result = await writeFile(inputPath, data, encoding, append, scope.get());
         return textResult(result);
       } catch (error) {
         return errorResult(error);
@@ -140,7 +143,7 @@ function registerTools(server: McpServer): void {
     },
     async ({ path: inputPath, target, replacement, allow_multiple }) => {
       try {
-        const result = await replaceInFile(inputPath, target, replacement, allow_multiple);
+        const result = await replaceInFile(inputPath, target, replacement, allow_multiple, scope.get());
         return textResult(result);
       } catch (error) {
         return errorResult(error);
@@ -153,7 +156,7 @@ function registerTools(server: McpServer): void {
     {
       title: "Search files",
       description:
-        "Search files by name pattern (e.g. *.ts) and/or search for text/regex inside file contents.",
+        "Search files by name pattern (e.g. *.ts) and/or search for text/regex inside file contents. Files that could not be searched (larger than MAX_FILE_BYTES, unreadable) are listed in skipped; non-UTF-8 text is decoded with the system code page.",
       inputSchema: {
         path: z.string().min(1).describe("Base directory to search in"),
         pattern: z
@@ -179,7 +182,7 @@ function registerTools(server: McpServer): void {
     },
     async ({ path: inputPath, pattern, query, case_sensitive, max_results }) => {
       try {
-        const result = await searchFiles(inputPath, pattern, query, case_sensitive, max_results);
+        const result = await searchFiles(inputPath, pattern, query, case_sensitive, max_results, scope.get());
         return textResult(result);
       } catch (error) {
         return errorResult(error);
@@ -191,7 +194,7 @@ function registerTools(server: McpServer): void {
     "file_list",
     {
       title: "List files",
-      description: "List files and directories at a host path.",
+      description: "List files and directories at a host path. When truncated is true, continue from next_offset.",
       inputSchema: {
         path: z.string().min(1).describe("Directory path to list"),
         recursive: z.boolean().default(false).describe("Whether to list subdirectories recursively"),
@@ -202,11 +205,17 @@ function registerTools(server: McpServer): void {
           .max(10_000)
           .default(500)
           .describe("Maximum number of items to return"),
+        offset: z
+          .number()
+          .int()
+          .nonnegative()
+          .default(0)
+          .describe("Number of entries to skip; pass next_offset from the previous page"),
       },
     },
-    async ({ path: inputPath, recursive, max_entries }) => {
+    async ({ path: inputPath, recursive, max_entries, offset }) => {
       try {
-        const result = await listFiles(inputPath, recursive, max_entries);
+        const result = await listFiles(inputPath, recursive, max_entries, scope.get(), offset);
         return textResult(result);
       } catch (error) {
         return errorResult(error);
@@ -225,7 +234,7 @@ function registerTools(server: McpServer): void {
     },
     async ({ path: inputPath }) => {
       try {
-        const result = await statPath(inputPath);
+        const result = await statPath(inputPath, scope.get());
         return textResult(result);
       } catch (error) {
         return errorResult(error);
@@ -244,7 +253,7 @@ function registerTools(server: McpServer): void {
     },
     async ({ path: inputPath }) => {
       try {
-        const result = await createDirectory(inputPath);
+        const result = await createDirectory(inputPath, scope.get());
         return textResult(result);
       } catch (error) {
         return errorResult(error);
@@ -265,7 +274,7 @@ function registerTools(server: McpServer): void {
     },
     async ({ source, destination, overwrite }) => {
       try {
-        const result = await movePath(source, destination, overwrite);
+        const result = await movePath(source, destination, overwrite, scope.get());
         return textResult(result);
       } catch (error) {
         return errorResult(error);
@@ -286,7 +295,7 @@ function registerTools(server: McpServer): void {
     },
     async ({ path: inputPath, recursive }) => {
       try {
-        const result = await deletePath(inputPath, recursive);
+        const result = await deletePath(inputPath, recursive, scope);
         return textResult(result);
       } catch (error) {
         return errorResult(error);
@@ -304,7 +313,7 @@ function registerTools(server: McpServer): void {
     async () => {
       try {
         return textResult({
-          cwd: getActiveWorkingDir(),
+          cwd: getActiveWorkingDir(scope),
           files_root: config.filesRoot,
         });
       } catch (error) {
@@ -325,7 +334,7 @@ function registerTools(server: McpServer): void {
     },
     async ({ path: inputPath }) => {
       try {
-        const cwd = setActiveWorkingDir(inputPath);
+        const cwd = setActiveWorkingDir(inputPath, scope);
         return textResult({
           cwd,
           files_root: config.filesRoot,
@@ -446,15 +455,17 @@ function registerTools(server: McpServer): void {
     "browser_get_content",
     {
       title: "Get webpage content",
-      description: "Extract readable text, raw HTML, or title from the active webpage or a specific selector.",
+      description: "Extract readable text, raw HTML, or title from the active webpage or a specific selector. Long content comes in pages: while truncated is true, continue from next_offset.",
       inputSchema: {
         type: z.enum(["text", "html", "title"]).default("text").describe("Type of content: 'text' (rendered text), 'html' (DOM HTML), or 'title'"),
         selector: z.string().optional().describe("Optional CSS selector to target a specific container element"),
+        offset: z.number().int().nonnegative().default(0).describe("First character to return (UTF-16 index); pass next_offset from the previous page"),
+        length: z.number().int().positive().optional().describe("Maximum number of characters to return"),
       },
     },
-    async ({ type, selector }) => {
+    async ({ type, selector, offset, length }) => {
       try {
-        const result = await browserManager.getContent({ type, selector });
+        const result = await browserManager.getContent({ type, selector, offset, length });
         return textResult(result);
       } catch (error) {
         return errorResult(error);
@@ -474,7 +485,7 @@ function registerTools(server: McpServer): void {
     },
     async ({ path: outputPath, full_page }) => {
       try {
-        const result = await browserManager.screenshot({ path: outputPath, fullPage: full_page });
+        const result = await browserManager.screenshot({ path: outputPath, fullPage: full_page, cwd: scope.get() });
         return textResult(result);
       } catch (error) {
         return errorResult(error);

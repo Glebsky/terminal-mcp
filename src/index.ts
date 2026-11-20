@@ -5,7 +5,16 @@ import { startTunnel, stopTunnel } from "./tunnel/index.js";
 
 const app = createApp();
 
-const httpServer = app.listen(config.port, config.host, async () => {
+// Express 5 hands listen errors (EADDRINUSE, EACCES, ...) to this callback instead of throwing (SPEC-005 FR-3).
+const httpServer = app.listen(config.port, config.host, async (error?: Error) => {
+  if (error) {
+    const code = (error as NodeJS.ErrnoException).code || "LISTEN_FAILED";
+    console.error(`Cannot listen on ${config.host}:${config.port}: ${code} ${error.message}`);
+    const exit = () => process.exit(1);
+    if (process.connected && process.send) process.send({ type: "server:error", code, port: config.port, message: error.message }, exit);
+    else exit();
+    return;
+  }
   console.log(`MCP Terminal listening on http://${config.host}:${config.port}/mcp`);
   console.log(
     `Filesystem mode: ${config.fullAccess ? "FULL HOST ACCESS (UNRESTRICTED)" : `restricted to ${config.filesRoot}`}`,

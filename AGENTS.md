@@ -78,6 +78,11 @@ Execute a terminal command on the host (PowerShell or cmd.exe) with native UTF-8
 }
 ```
 
+- The call always returns within `timeout_ms + 2 s`. After the shell exits, output is drained for at most 1 s; if a background child (e.g. `start /b ...`) still holds the output pipe, the result includes `"backgroundLeft": true` and that child keeps running.
+- If the client disconnects or cancels the request, the process tree is killed and the result includes `"aborted": true`.
+- With `shell: "cmd"` the command text reaches cmd verbatim (quotes, `&`, `|`, `%`, `^`, `!` behave as in `cmd /c`), and built-ins such as `echo` and `dir` print UTF-8.
+- stdout and stderr are capped at `MAX_OUTPUT_BYTES` each (`"truncated": true`) and cut at a character boundary. The rest cannot be fetched: redirect long output to a file and read it with `file_read`.
+
 ---
 
 ### 3.2 `file_search`
@@ -100,12 +105,18 @@ Search files by glob pattern (e.g., `*.ts`) and/or search for text/regex inside 
     {
       "path": "C:\\workspace\\project\\src\\config.ts",
       "line": 15,
+      "column": 7,
       "snippet": "const PORT = integerEnv(\"PORT\", 3000);"
     }
   ],
   "truncated": false
 }
 ```
+
+- `column` is the 1-based position of the match in the line (UTF-16 characters); `snippet` is up to 500 characters of the line around the match, copied verbatim.
+- Long lines are searched completely (in overlapping windows; a single match longer than 1,000 characters on a line longer than 4,000 can be missed).
+- Files up to `MAX_FILE_BYTES` are searched. Whatever could not be searched (larger files, unreadable files or directories) is listed in `skipped` (`[{ "path", "reason" }]`, up to 50) with `skipped_total`, so empty `results` without `skipped` really means "not found". Binary files are ignored.
+- Text that is not UTF-8 is decoded with the system ANSI code page (e.g. windows-1251), files with a UTF-16 BOM are read as UTF-16; such matches carry `encoding`. `file_replace` still refuses non-UTF-8 files.
 
 ---
 
@@ -127,6 +138,10 @@ Replace an exact block of code or text inside a file without rewriting the entir
   "replacements": 1
 }
 ```
+
+- Writes to the same path are serialized and atomic (temp file + rename), so parallel edits of one file do not lose each other.
+- Retrying an edit that already landed is safe: if `target` is gone and `replacement` occurs exactly once, the answer is `"replacements": 0, "already_applied": true` instead of an error.
+- Files that are not valid UTF-8 (e.g. cp1251) are rejected; edit them with `terminal_execute`.
 
 ---
 
@@ -153,6 +168,10 @@ Read text or binary files with optional chunking/offset.
   "data": "... file content ..."
 }
 ```
+
+- With `encoding: "utf8"` a chunk never splits a character: the end moves back to the last whole character, an `offset` inside a character moves back to its first byte (the response `offset` is the actual one), and a `length` shorter than one character still returns that whole character.
+- While `truncated` is `true`, the response has `next_offset`. Read the next chunk from `next_offset`, not from `offset + length`, or the bytes trimmed at the edge are skipped.
+- `base64` returns the exact requested bytes. Read non-UTF-8 text (e.g. cp1251) as base64.
 
 ---
 
@@ -187,6 +206,9 @@ List files and subdirectories in a directory path.
 | `path` | `string` | Yes | - | Directory path. |
 | `recursive` | `boolean` | No | `false` | Scan directory recursively. |
 | `max_entries` | `number` | No | `500` | Max entries to return (max: 10,000). |
+| `offset` | `number` | No | `0` | Entries to skip; pass `next_offset` from the previous page. |
+
+When `truncated` is `true`, the response has `next_offset`. Pages are consistent while the directory does not change.
 
 ---
 
@@ -219,6 +241,8 @@ Move or rename a file or directory.
 | `source` | `string` | Yes | - | Source path. |
 | `destination` | `string` | Yes | - | Destination path. |
 | `overwrite` | `boolean` | No | `false` | Overwrite destination if it already exists. |
+
+If the move succeeded but the backup of the overwritten destination could not be removed, the answer is still a success and includes `backup_left` with the backup path.
 
 ---
 
@@ -265,6 +289,9 @@ Change the active working directory for subsequent file operations and terminal 
   "message": "Active working directory switched to: C:\\OSPanel\\home\\sandustry"
 }
 ```
+
+- Over SSE (`/sse`) each session has its own working directory, starting from the shared one at connect time; `workspace_set_cwd`, a bare `cd` in `terminal_execute` and the reset after `file_delete` change only that session. Stateless `/mcp` requests share one process-wide working directory.
+- Relative paths for writes (`file_write`, `file_replace`, `file_move`, `file_delete`, `file_mkdir`, `browser_screenshot` path) resolve only against the working directory, never silently against `FILES_ROOT`. Reads, search, `workspace_set_cwd` and the `cwd` of `terminal_execute` still fall back to `FILES_ROOT`.
 
 ---
 
@@ -343,6 +370,10 @@ Extract readable text, raw HTML, or title from the active webpage or a specific 
 |---|---|---|---|---|
 | `type` | `"text" \| "html" \| "title"` | No | `"text"` | Content type to extract. |
 | `selector` | `string` | No | - | Optional CSS selector to target a specific container element. |
+| `offset` | `number` | No | `0` | First character to return (UTF-16 index); pass `next_offset` from the previous page. |
+| `length` | `number` | No | - | Maximum number of characters to return. |
+
+The response has `content`, `offset`, `length`, `total_length` and `truncated`, plus `next_offset` while `truncated` is `true`. `MAX_OUTPUT_BYTES` counts UTF-8 bytes; page edges never split a character. If the page changes between calls, the pieces may not line up.
 
 ---
 
