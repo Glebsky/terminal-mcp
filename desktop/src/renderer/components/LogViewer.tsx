@@ -62,17 +62,14 @@ export const LogViewer: React.FC<LogViewerProps> = ({ logs, onClear }) => {
             />
           </div>
 
-          {/* Filter Pills */}
-          <div className="flex items-center gap-1 bg-slate-900/60 p-0.5 rounded-lg border border-white/5 text-[11px]">
+          {/* Filter Pills: frosted selection like the workspace tabs (SPEC-007) */}
+          <div className="log-filters">
             {(["all", "audit", "command", "file", "error"] as const).map((tab) => (
               <button
                 key={tab}
+                type="button"
                 onClick={() => setFilter(tab)}
-                className={`px-2 py-0.5 rounded-md font-medium capitalize transition-colors ${
-                  filter === tab
-                    ? "bg-gradient-to-r from-violet-600/80 to-cyan-600/80 text-white shadow-sm"
-                    : "text-slate-400 hover:text-white"
-                }`}
+                aria-pressed={filter === tab}
               >
                 {t(("logs.filter." + tab) as MessageKey)}
               </button>

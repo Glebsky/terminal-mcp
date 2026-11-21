@@ -96,10 +96,11 @@
   :root:not(.dark) .app-shell :is([class*=text-rose-],[class*=text-red-]) { color:hsl(var(--destructive)); }
   :root:not(.dark) .app-shell button.bg-gradient-to-r,:root:not(.dark) .app-shell button.bg-gradient-to-r * { color:hsl(var(--primary-foreground)); }
   :root:not(.dark) .app-shell .liquid-glass-btn { color:hsl(var(--foreground)); background:hsl(var(--card)/.85); border-color:hsl(var(--border)); }
-  :root:not(.dark) .app-shell :is(.workspace-tabs,.monitor-stats>div,.client-list,.monitor-toggle) { background:hsl(var(--card)/.6); border-color:hsl(var(--border)/.7); }
-  :root:not(.dark) .app-shell :is(.workspace-tabs button,.section-eyebrow,.clients-heading,.pipe-caption,.monitor-stats span,.monitor-stats small,.client-row,.client-empty,.monitor-note,.monitor-paused,.flow-legend) { color:hsl(var(--muted-foreground)); }
+  :root:not(.dark) .app-shell :is(.workspace-tabs,.log-filters,.monitor-stats>div,.client-list,.monitor-toggle) { background:hsl(var(--card)/.6); border-color:hsl(var(--border)/.7); }
+  :root:not(.dark) .app-shell :is(.workspace-tabs button,.log-filters button,.section-eyebrow,.clients-heading,.pipe-caption,.monitor-stats span,.monitor-stats small,.client-row,.client-empty,.monitor-note,.monitor-paused,.flow-legend) { color:hsl(var(--muted-foreground)); }
   :root:not(.dark) .app-shell :is(.monitor-heading h2,.monitor-stats strong,.client-name,.monitor-paused h2,.monitor-paused button) { color:hsl(var(--foreground)); }
-  :root:not(.dark) .app-shell .workspace-tabs button[aria-selected=true] { color:hsl(var(--primary)); background:hsl(var(--primary)/.1); }
+  :root:not(.dark) .app-shell :is(.workspace-tabs button[aria-selected=true],.log-filters button[aria-pressed=true]) { color:hsl(var(--primary)); background:hsl(var(--primary)/.1); }
+:root:not(.dark) .app-shell .log-filters button:not([aria-pressed=true]):hover { color:hsl(var(--foreground)); }
   :root:not(.dark) .app-shell .monitor-live { color:hsl(var(--success)); }
   :root:not(.dark) .app-shell :is(.pipe-caption span:last-child,.clients-heading span:last-child,.pipe-caption em,.flow-legend b) { color:hsl(var(--muted-foreground)); }
   /* SPEC-003: the section follows the light surface; the flow pipe stays a dark instrument window so the band keeps its glow. */
