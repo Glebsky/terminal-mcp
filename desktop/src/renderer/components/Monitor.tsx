@@ -1,12 +1,19 @@
 import React, { useCallback, useState } from "react";
 import { Activity, Users, Radio, Info } from "lucide-react";
-import type { MonitorSnapshot, ServerStatus } from "../../types";
+import type { MonitorSnapshot, ServerStatus, RecentClient } from "../../types";
 import { operationColor } from "./operationColor";
 import { useI18n } from "../i18n";
 import { FlowRibbon } from "./flow/FlowRibbon";
 import { EasedValue } from "./flow/EasedValue";
 
 interface Props { snapshot: MonitorSnapshot | null; status: ServerStatus; animation: boolean }
+
+function parseClientLabel(client: RecentClient) {
+  const name = client.displayName || (client.client.includes(" · ") ? client.client.split(" · ")[0] : client.client);
+  const peer = client.peer || (client.client.includes(" · ") ? client.client.split(" · ")[1] : "");
+  const initial = (name.replace(/^[^a-zA-Z0-9а-яА-ЯёЁ]+/, "").charAt(0) || name.charAt(0) || "?").toUpperCase();
+  return { name, version: client.version, peer, initial };
+}
 
 function bytes(value: number): string {
   if (value < 1024) return Math.round(value) + " B";
@@ -61,7 +68,22 @@ export const Monitor: React.FC<Props> = ({ snapshot, status, animation }) => {
       </div>
       <div className="clients-heading"><span><Users size={14}/> {t("monitor.recentClients")}</span><span>{t("monitor.shown", { count: clients.length })}</span></div>
       <div className="client-list">
-        {!clients.length ? <div className="client-empty">{t("monitor.noClients")}</div> : clients.map(client => <div className="client-row" key={client.client}><span className="client-avatar">{client.client.charAt(0).toUpperCase()}</span><span className="client-name" title={client.client}>{client.client}</span><span className="client-operation" style={{ color: operationColor(client.operation) }}>{client.operation}</span><span>{t("monitor.requests", { count: client.requests })}</span><time dateTime={client.lastSeen}>{new Date(client.lastSeen).toLocaleTimeString(locale)}</time></div>)}
+        {!clients.length ? <div className="client-empty">{t("monitor.noClients")}</div> : clients.map(client => {
+          const info = parseClientLabel(client);
+          return (
+            <div className="client-row" key={client.client}>
+              <span className="client-avatar" aria-hidden="true">{info.initial}</span>
+              <span className="client-name" title={client.client}>
+                <strong className="client-title">{info.name}</strong>
+                {info.version && <span className="client-version">v{info.version}</span>}
+                {info.peer && <span className="client-peer">{info.peer}</span>}
+              </span>
+              <span className="client-operation" style={{ color: operationColor(client.operation) }}>{client.operation}</span>
+              <span className="client-count">{t("monitor.requests", { count: client.requests })}</span>
+              <time dateTime={client.lastSeen}>{new Date(client.lastSeen).toLocaleTimeString(locale)}</time>
+            </div>
+          );
+        })}
       </div>
       <p className="monitor-note"><Info size={13}/> {t("monitor.note")}</p>
     </section>

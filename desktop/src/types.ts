@@ -27,10 +27,20 @@ export interface LogEntry {
   raw?: string;
 }
 
+export interface RecentClient {
+  client: string;
+  displayName?: string;
+  version?: string;
+  peer?: string;
+  operation: string;
+  lastSeen: string;
+  requests: number;
+}
+
 export interface MonitorSnapshot {
   received: number; sent: number; totalReceived: number; totalSent: number;
   totalRequests: number; activeRequests: number; activeSse: number; activeHttp: number; sampledAt: number;
-  recentClients: { client: string; operation: string; lastSeen: string; requests: number }[];
+  recentClients: RecentClient[];
   operations: { operation: string; received: number; sent: number }[];
 }
 

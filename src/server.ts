@@ -8,7 +8,7 @@ import { authDescription, authenticate } from "./middleware/auth.js";
 import { validateHost } from "./middleware/host.js";
 import { registerAllTools } from "./tools/index.js";
 import { createSessionScope, globalScope, type WorkspaceScope } from "./tools/filesystem.js";
-import { monitorRequest, recordRequestBody, setSseCountProvider } from "./monitor.js";
+import { monitorRequest, recordRequestBody, setSseCountProvider, forgetSessionClient } from "./monitor.js";
 
 const SERVER_NAME = "notion-terminal-files";
 const SERVER_VERSION: string = (() => {
@@ -130,6 +130,7 @@ export function createApp(): Express {
 
     res.on("close", () => {
       sseSessions.delete(sessionId);
+      forgetSessionClient(sessionId);
       void transport.close();
       void server.close();
       console.log(`[SSE] Client disconnected: session ${sessionId} (active: ${sseSessions.size})`);
@@ -139,6 +140,7 @@ export function createApp(): Express {
       await server.connect(transport);
     } catch (error) {
       sseSessions.delete(sessionId);
+      forgetSessionClient(sessionId);
       console.error(new Date().toISOString(), "SSE Handshake Error:", error);
     }
   });
