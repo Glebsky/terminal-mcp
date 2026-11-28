@@ -43,7 +43,11 @@ Technical specification and operational guide for AI Agents (Notion Custom Agent
   - Path traversal attempts (`../`, symlink escapes, absolute paths pointing outside `FILES_ROOT`) are immediately rejected with an error.
   - Working directories (`cwd`) for `terminal_execute` default to `FILES_ROOT`.
 - **When `FULL_ACCESS=true` (Unrestricted Mode)**:
-  - The agent has full access to the host filesystem with permissions of the host user running the server.
+  - File tools may work outside `FILES_ROOT`, but the server-owned paths remain protected. Host processes use the operating-system permissions of the server account.
+
+The server's own environment files, its explicit configuration directory, the configured audit log and entries in `PROTECTED_PATHS` are private to the owner. Metadata may be returned with `protected: true`; search reports `reason: "protected"`. Treat that response as final. Ask the owner to use the desktop settings or a local editor for maintenance. An explicit `DOTENV_PATH` reserves its whole parent directory, not just the file.
+
+Output filtering replaces only known literal credential values of at least eight characters (after pagination). It does not alter offsets and is not a scanner of arbitrary project files, binary output, partial strings or all representations of a value. A restricted working directory is not an operating-system sandbox for commands. See [Security](SECURITY.md).
 
 ### 2.2 Limits and Buffers
 - `MAX_OUTPUT_BYTES` (default: 1 MB): Terminal output exceeding this limit is capped with `truncated: true`.
@@ -53,6 +57,8 @@ Technical specification and operational guide for AI Agents (Notion Custom Agent
 ---
 
 ## 3. Tool Specifications
+
+The default catalog has 24 tools. [contracts/tools.json](contracts/tools.json) is the machine-readable reference. Its four MCP annotations describe behavior; they do not enforce authorization, request consent or grant permissions.
 
 ### 3.1 `terminal_execute`
 Execute a terminal command on the host (PowerShell or cmd.exe) with native UTF-8 encoding.
@@ -389,12 +395,24 @@ Capture a screenshot of the active browser page. Can save to file or return base
 ---
 
 ### 3.20 `browser_close`
-Close the active browser instance and all tabs.
+Close a browser launched by the server; when attached to an existing profile, disconnect and leave its tabs open.
 
 #### Input Schema
 *(No parameters)*
 
 ---
+
+### 3.21 `browser_connect`
+Attach to an owner-approved browser profile. Inputs: `endpoint`, `launch_if_missing`, `browser`, `timeout_ms`. Use a dedicated profile rather than the owner's everyday session.
+
+### 3.22 `browser_list_tabs`
+List tabs in the current session, including active and visible state. No parameters.
+
+### 3.23 `browser_new_tab`
+Create and select a new tab; `url` is optional. Local file URLs follow the same protected-path policy as file reads.
+
+### 3.24 `browser_select_tab`
+Select by `index`, `url_contains`, or `title_contains`. Without a selector, follow the visible tab. `bring_to_front` controls whether the visible tab changes.
 
 ## 4. Agent Best Practices & Recommended Workflows
 

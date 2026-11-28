@@ -38,8 +38,8 @@ Includes built-in zero-config public tunneling via the official **Ngrok Node.js 
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/Speedstu/notion-terminal-mcp.git
-cd notion-terminal-mcp
+git clone https://github.com/Glebsky/terminal-mcp.git
+cd terminal-mcp
 npm install
 ```
 
@@ -117,6 +117,8 @@ Authentication Header:
 
 #### Alternative: Free Cloudflare Quick Tunnel (No Account Required)
 
+**Testing only:** the address changes on restart. Use `/mcp` for non-streaming requests; `/sse` is not supported. Choose a named tunnel for a stable address. [Cloudflare limitations](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/).
+
 If you don't have an Ngrok account, run:
 
 ```powershell
@@ -144,7 +146,7 @@ This PowerShell script automatically:
 4. Set **Authentication**:
    - Header Name: `Authorization`
    - Header Value: `Bearer <YOUR_MCP_API_KEY>` (or use `x-api-key: <YOUR_MCP_API_KEY>`)
-5. Test the connection. Notion will automatically discover all **20 tools** across terminal execution, filesystem operations, workspace navigation, and host browser automation.
+5. Test the connection. Notion will automatically discover all **24 tools** across terminal execution, filesystem operations, workspace navigation, and host browser automation.
 
 ---
 
@@ -161,7 +163,9 @@ This PowerShell script automatically:
 
 `MCP_API_KEY` is required only while `bearer` or `query` is enabled. Changes apply after a restart.
 
-## Available MCP Tools (20 Tools)
+## Available MCP Tools (24 Tools)
+
+`tools/list` includes hints about reading, destructive changes, repeated calls and external state. Hints are advisory, not permissions or consent. [Exact schemas and flags](contracts/tools.json).
 
 See [AGENTS.md](AGENTS.md) for full JSON schemas, input parameters, response formats, and agent best practices.
 
@@ -199,7 +203,11 @@ See [AGENTS.md](AGENTS.md) for full JSON schemas, input parameters, response for
 | `browser_type` | Type text into an input or textarea element on the active page, with optional field clearing. |
 | `browser_get_content` | Extract rendered text, raw DOM HTML, or page title from the document or a specific CSS selector. |
 | `browser_screenshot` | Capture full-page or viewport screenshots to a PNG file or return base64. |
-| `browser_close` | Close the active browser instance and all open tabs cleanly. |
+| `browser_connect` | Connect to a browser profile explicitly chosen by the owner. |
+| `browser_list_tabs` | List tabs in this browser session and identify the active tab. |
+| `browser_new_tab` | Open a new tab, optionally navigate, and select it. |
+| `browser_select_tab` | Select a tab by index, URL or title; optionally bring it to the front. |
+| `browser_close` | Close a browser the server launched, or detach from an existing profile without closing its tabs. |
 
 ---
 
@@ -207,7 +215,7 @@ See [AGENTS.md](AGENTS.md) for full JSON schemas, input parameters, response for
 
 | Variable | Default | Description |
 |---|---|---|
-| `MCP_API_KEY` | *required* | Secret key for authentication (min 32 characters). |
+| `MCP_API_KEY` | *required for bearer/query* | Secret key for authentication (min 32 characters). |
 | `PORT` | `3000` | Port for the HTTP server. |
 | `HOST` | `127.0.0.1` | Host address to bind to. |
 | `NGROK_ENABLED` | `false` | Enable/disable automatic ngrok tunnel creation on start. |
@@ -219,6 +227,23 @@ See [AGENTS.md](AGENTS.md) for full JSON schemas, input parameters, response for
 | `COMMAND_TIMEOUT_MS` | `120000` | Default timeout for terminal commands (2 minutes). |
 | `MAX_OUTPUT_BYTES` | `1048576` | Max stdout/stderr capture size (1 MB). |
 | `MAX_FILE_BYTES` | `10485760` | Max file size read/write limit per request (10 MB). |
+| `AUTH_METHODS` | `bearer` | Enabled authentication methods. Prefer header authentication. |
+| `BASIC_AUTH_USER`, `BASIC_AUTH_PASSWORD` | unset | Required only when Basic authentication is enabled. |
+| `ALLOW_NO_AUTH` | unset | Existing local acknowledgement for unauthenticated mode; keep unset. |
+| `TUNNEL_PROVIDER` | `none`¹ | Choose none, ngrok, tuna, cloudflare or localtunnel. |
+| `TUNA_EXECUTABLE`, `TUNA_SUBDOMAIN`, `TUNA_API_KEY` | `tuna` / unset | CLI path, optional subdomain and optional provider credential. |
+| `CLOUDFLARED_EXECUTABLE`, `CLOUDFLARE_MODE` | `cloudflared` / `quick` | Connector path and mode (quick or named). |
+| `CLOUDFLARE_TUNNEL_TOKEN`, `CLOUDFLARE_PUBLIC_URL` | unset | Named tunnel credential and routed HTTPS origin. |
+| `LOCALTUNNEL_EXECUTABLE`, `LOCALTUNNEL_SUBDOMAIN` | `lt` / unset | CLI path and optional requested subdomain. |
+| `DISABLED_TOOLS` | unset | Names omitted from tools/list and unavailable for calls. |
+| `AUDIT_LOG_FILE` | unset | Optional private JSONL log; tool access to its contents is denied. |
+| `MAX_SSE_SESSIONS` | `32` | Maximum simultaneous legacy SSE sessions. |
+| `DOTENV_PATH` | unset | Optional configuration file; its whole parent directory is reserved for the server. Use a separate private directory. |
+| `PROTECTED_PATHS` | unset | Additional private files/directories, separated by semicolons. Prefer absolute paths. |
+
+The server-owned paths remain private to MCP file tools even with `FULL_ACCESS=true`. The desktop owner can still edit the configuration directly. An `ALLOW_SELF_ACCESS` switch is not available in this revision.
+
+¹ Without an explicit provider, legacy `NGROK_ENABLED` still applies. See [Tunnels](TUNNELS.md) and [Security](SECURITY.md).
 
 ---
 
@@ -244,7 +269,7 @@ notion-terminal-mcp/
 │   ├── middleware/
 │   │   ├── auth.ts            # Timing-safe token & API key authentication
 │   │   └── host.ts            # Host header validation & DNS rebinding guard
-│   ├── tools/                 # 20 MCP Tools
+│   ├── tools/                 # 24 MCP Tools
 │   │   ├── browser.ts         # Puppeteer-core browser automation manager
 │   │   ├── command.ts         # Process tree management & execution
 │   │   ├── filesystem.ts      # Sandboxed filesystem CRUD operations

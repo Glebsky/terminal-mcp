@@ -100,6 +100,10 @@ export const config = {
   apiKey: API_KEY,
   auth: { methods: AUTH_METHODS, basicUser: BASIC_AUTH_USER, basicPassword: BASIC_AUTH_PASSWORD },
   fullAccess: FULL_ACCESS,
+  serverPaths: {
+    serverDir: process.cwd(), envFile: process.env.DOTENV_PATH?.trim() || "", auditFile: process.env.AUDIT_LOG_FILE?.trim() || "",
+    extra: (process.env.PROTECTED_PATHS ?? "").split(";").map(p => p.trim()).filter(Boolean),
+  },
   filesRoot: FILES_ROOT,
   commandTimeoutMs: COMMAND_TIMEOUT_MS,
   maxOutputBytes: MAX_OUTPUT_BYTES,

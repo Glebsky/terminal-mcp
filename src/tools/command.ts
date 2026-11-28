@@ -73,7 +73,7 @@ export async function executeCommand(
 ): Promise<CommandExecutionResult> {
   const scope = options.scope ?? globalScope;
   // `cwd` applies to this call only and does not change the session's working directory.
-  const actualCwd = cwd ? resolveTarget(cwd, { cwd: scope.get() }) : scope.get();
+  const actualCwd = resolveTarget(cwd ?? scope.get(), { cwd: scope.get(), tool: "terminal_execute" });
   let cwdIsDirectory = false;
   try {
     cwdIsDirectory = fsSync.statSync(actualCwd).isDirectory();

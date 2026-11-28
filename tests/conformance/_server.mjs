@@ -50,7 +50,7 @@ export async function startServer(options = {}) {
   if (!fs.existsSync(SERVER_ENTRY)) throw new Error('Build the isolated server first: npm run build:server');
   const port = options.port ?? await freePort();
   const root = options.root ?? tempDir(), key = options.key ?? `conf_${randomBytes(24).toString('hex')}`;
-  const env = { ...systemEnv(), ...options.env, DOTENV_PATH: path.join(root, '.no-such-env'),
+  const env = { ...systemEnv(), ...options.env, DOTENV_PATH: path.join(root, '.fixture-settings', '.env'),
     PORT: String(port), HOST: '127.0.0.1', MCP_API_KEY: key, MCP_CONTROL: 'stdio', AUTH_METHODS: options.env?.AUTH_METHODS ?? 'bearer',
     NGROK_ENABLED: 'false', TUNNEL_PROVIDER: 'none', ALLOWED_HOSTS: `127.0.0.1:${port};localhost:${port}`,
     FULL_ACCESS: 'false', FILES_ROOT: root, DISABLED_TOOLS: '' };

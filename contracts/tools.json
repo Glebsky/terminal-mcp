@@ -23,6 +23,12 @@
         "selector"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
     }
   },
   {
@@ -33,6 +39,12 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {},
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
     }
   },
   {
@@ -69,6 +81,12 @@
         }
       },
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
     }
   },
   {
@@ -88,6 +106,12 @@
         "script"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
     }
   },
   {
@@ -126,6 +150,12 @@
         }
       },
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
     }
   },
   {
@@ -136,6 +166,12 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {},
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
     }
   },
   {
@@ -172,6 +208,12 @@
         "url"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
     }
   },
   {
@@ -188,6 +230,12 @@
         }
       },
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
     }
   },
   {
@@ -221,6 +269,12 @@
         "url"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
     }
   },
   {
@@ -241,6 +295,12 @@
         }
       },
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false
     }
   },
   {
@@ -273,6 +333,12 @@
         }
       },
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
     }
   },
   {
@@ -309,6 +375,12 @@
         "text"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
     }
   },
   {
@@ -333,6 +405,12 @@
         "path"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
     }
   },
   {
@@ -371,6 +449,12 @@
         "path"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
     }
   },
   {
@@ -390,6 +474,12 @@
         "path"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
     }
   },
   {
@@ -420,6 +510,12 @@
         "destination"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
     }
   },
   {
@@ -461,6 +557,12 @@
         "path"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
     }
   },
   {
@@ -496,6 +598,12 @@
         "replacement"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
     }
   },
   {
@@ -535,6 +643,12 @@
         "path"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
     }
   },
   {
@@ -554,6 +668,12 @@
         "path"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
     }
   },
   {
@@ -592,6 +712,12 @@
         "data"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false,
+      "readOnlyHint": false
     }
   },
   {
@@ -630,6 +756,12 @@
         "command"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false
     }
   },
   {
@@ -640,6 +772,12 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "properties": {},
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
     }
   },
   {
@@ -659,6 +797,12 @@
         "path"
       ],
       "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false
     }
   }
 ]

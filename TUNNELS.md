@@ -17,7 +17,7 @@ Open **Settings**. The groups are Appearance, Public connection, Server, and Sec
 | ngrok | Built-in SDK, ngrok account/token | Domain availability, traffic and fixed domains depend on the provider plan. |
 | Tuna | Install Tuna CLI; `tuna login` or API key with `tunnels:connect` | Assigned free permanent subdomain is account-bound. Arbitrary names/custom domains may require a subscription. |
 | Cloudflare — named | Install cloudflared; connector token and an already routed HTTPS hostname | Route the hostname in Cloudflare to this local host/port. Do not put an interactive Access login in front of MCP unless supported by the client. |
-| Cloudflare — quick | Install cloudflared | Temporary hostname, **no SSE**. Marked **Unverified**; `/sse` and streaming MCP can fail. Not recommended for MCP. |
+| Cloudflare — quick | Install cloudflared | **Testing only.** The hostname changes on restart and [Quick Tunnels do not support SSE](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/). Try `/mcp` for non-streaming requests, not `/sse`. Remains **Unverified**. |
 | LocalTunnel | Explicitly install `npm install -g localtunnel` | Experimental. A password/interstitial page can block MCP clients. Requested subdomains are not guaranteed. Always marked **Unverified**. |
 
 Save, then explicitly **Restart** (or Start if stopped). Saving never restarts a running server. The active connection and Bearer key stay unchanged until restart. Provider-specific settings are retained when switching. Only one tunnel runs at a time.

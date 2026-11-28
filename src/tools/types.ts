@@ -1,3 +1,5 @@
+import { redactOutput } from "../utils/logger.js";
+
 export interface TextContent {
   type: "text";
   text: string;
@@ -10,7 +12,16 @@ export interface ToolResult {
 }
 
 export function textResult(value: unknown, isError = false): ToolResult {
-  const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  // Pagination has already happened. Redact before JSON escaping to handle quotes and backslashes,
+  // including keys in arbitrary JSON output, and leave offsets/byte counts untouched.
+  const text = typeof value === "string" ? redactOutput(value) : JSON.stringify(value, (_key, v: unknown) => {
+    if (typeof v === "string") return redactOutput(v);
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const entries = Object.entries(v);
+      if (entries.some(([k]) => redactOutput(k) !== k)) return Object.fromEntries(entries.map(([k,item]) => [redactOutput(k),item]));
+    }
+    return v;
+  }, 2);
   return { content: [{ type: "text", text }], isError };
 }
 

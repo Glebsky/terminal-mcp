@@ -1,6 +1,7 @@
 import { McpServer, type RegisteredTool } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { config } from "../config.js";
+import { TOOL_ANNOTATIONS } from "./annotations.js";
 import { textResult, errorResult } from "./types.js";
 import { executeCommand } from "./command.js";
 import {
@@ -49,6 +50,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "terminal_execute",
     {
+      annotations: TOOL_ANNOTATIONS.terminal_execute,
       title: "Execute a terminal command",
       description:
         "Execute a PowerShell or cmd command on the host. This has unrestricted host privileges when FULL_ACCESS=true. Output over MAX_OUTPUT_BYTES is cut at a character boundary (truncated: true); redirect long output to a file and read it with file_read.",
@@ -78,6 +80,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "file_read",
     {
+      annotations: TOOL_ANNOTATIONS.file_read,
       title: "Read a file",
       description: "Read a text or binary file from the host filesystem. UTF-8 chunks never split a character; while truncated is true, continue from next_offset.",
       inputSchema: {
@@ -106,6 +109,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "file_write",
     {
+      annotations: TOOL_ANNOTATIONS.file_write,
       title: "Write a file",
       description: "Create, overwrite, or append to a file. Parent directories are created automatically.",
       inputSchema: {
@@ -128,6 +132,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "file_replace",
     {
+      annotations: TOOL_ANNOTATIONS.file_replace,
       title: "Replace text in file",
       description:
         "Replace an exact substring or block of code in a file without rewriting the whole file.",
@@ -154,6 +159,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "file_search",
     {
+      annotations: TOOL_ANNOTATIONS.file_search,
       title: "Search files",
       description:
         "Search files by name pattern (e.g. *.ts) and/or search for text/regex inside file contents. Files that could not be searched (larger than MAX_FILE_BYTES, unreadable) are listed in skipped; non-UTF-8 text is decoded with the system code page.",
@@ -193,6 +199,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "file_list",
     {
+      annotations: TOOL_ANNOTATIONS.file_list,
       title: "List files",
       description: "List files and directories at a host path. When truncated is true, continue from next_offset.",
       inputSchema: {
@@ -226,6 +233,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "file_stat",
     {
+      annotations: TOOL_ANNOTATIONS.file_stat,
       title: "Inspect a path",
       description: "Return metadata for a file or directory.",
       inputSchema: {
@@ -245,6 +253,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "file_mkdir",
     {
+      annotations: TOOL_ANNOTATIONS.file_mkdir,
       title: "Create a directory",
       description: "Create a directory and any missing parent directories.",
       inputSchema: {
@@ -264,6 +273,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "file_move",
     {
+      annotations: TOOL_ANNOTATIONS.file_move,
       title: "Move or rename a path",
       description: "Move or rename a file or directory.",
       inputSchema: {
@@ -285,6 +295,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "file_delete",
     {
+      annotations: TOOL_ANNOTATIONS.file_delete,
       title: "Delete a path",
       description:
         "Permanently delete a file or directory. Recursive directory deletion must be explicitly enabled.",
@@ -306,6 +317,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "workspace_get_cwd",
     {
+      annotations: TOOL_ANNOTATIONS.workspace_get_cwd,
       title: "Get current working directory",
       description: "Get the current active working directory and files root.",
       inputSchema: {},
@@ -325,6 +337,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "workspace_set_cwd",
     {
+      annotations: TOOL_ANNOTATIONS.workspace_set_cwd,
       title: "Set current working directory",
       description:
         "Change the active working directory for subsequent file operations and terminal commands (e.g. 'sandustry'). Allows using short relative paths within that project.",
@@ -349,6 +362,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "browser_open",
     {
+      annotations: TOOL_ANNOTATIONS.browser_open,
       title: "Open URL in browser",
       description:
         "Open a webpage in host browser (Chrome or Edge). By default launches a visible browser window (headless=false) so you can test web applications visually.",
@@ -371,6 +385,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "browser_navigate",
     {
+      annotations: TOOL_ANNOTATIONS.browser_navigate,
       title: "Navigate to URL",
       description: "Navigate the active browser page to a new URL.",
       inputSchema: {
@@ -392,6 +407,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "browser_evaluate",
     {
+      annotations: TOOL_ANNOTATIONS.browser_evaluate,
       title: "Execute JavaScript in browser",
       description:
         "Evaluate arbitrary JavaScript code inside the active browser webpage context. Returns the evaluated value as JSON.",
@@ -412,6 +428,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "browser_click",
     {
+      annotations: TOOL_ANNOTATIONS.browser_click,
       title: "Click element on webpage",
       description: "Click an HTML element matching a CSS selector in the active browser page.",
       inputSchema: {
@@ -432,6 +449,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "browser_type",
     {
+      annotations: TOOL_ANNOTATIONS.browser_type,
       title: "Type text into element",
       description: "Type text into an input or textarea element on the active browser page.",
       inputSchema: {
@@ -454,6 +472,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "browser_get_content",
     {
+      annotations: TOOL_ANNOTATIONS.browser_get_content,
       title: "Get webpage content",
       description: "Extract readable text, raw HTML, or title from the active webpage or a specific selector. Long content comes in pages: while truncated is true, continue from next_offset.",
       inputSchema: {
@@ -476,6 +495,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "browser_screenshot",
     {
+      annotations: TOOL_ANNOTATIONS.browser_screenshot,
       title: "Take webpage screenshot",
       description: "Capture a screenshot of the active browser page. Can save to file or return base64.",
       inputSchema: {
@@ -496,6 +516,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "browser_connect",
     {
+      annotations: TOOL_ANNOTATIONS.browser_connect,
       title: "Connect to running browser",
       description:
         "Attach to an already running Chrome/Edge with its open tabs, cookies and logged-in sessions via the remote debugging port, instead of launching a new browser. " +
@@ -532,6 +553,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "browser_list_tabs",
     {
+      annotations: TOOL_ANNOTATIONS.browser_list_tabs,
       title: "List browser tabs",
       description: "List open tabs (index, url, title, whether visible to the user and whether active for browser_* tools) in the current browser session.",
       inputSchema: {},
@@ -549,6 +571,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "browser_select_tab",
     {
+      annotations: TOOL_ANNOTATIONS.browser_select_tab,
       title: "Select browser tab",
       description:
         "Choose which open tab subsequent browser_* tools operate on: by index (from browser_list_tabs), by URL or title substring, or with no arguments the tab the user is currently looking at.",
@@ -577,6 +600,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "browser_new_tab",
     {
+      annotations: TOOL_ANNOTATIONS.browser_new_tab,
       title: "Open new tab",
       description: "Open a new tab in the current browser session (optionally navigating to a URL) and make it the active tab for browser_* tools.",
       inputSchema: {
@@ -596,6 +620,7 @@ function registerTools(server: McpServer, scope: WorkspaceScope): void {
   server.registerTool(
     "browser_close",
     {
+      annotations: TOOL_ANNOTATIONS.browser_close,
       title: "Close browser",
       description:
         "Close the browser launched by this server. If attached via browser_connect, only disconnects and leaves the user's browser and tabs open.",

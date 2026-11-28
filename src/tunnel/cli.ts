@@ -4,6 +4,8 @@ import { config } from "../config.js";
 import { tunnelStatus, redactTunnelError } from "./status.js";
 import { resolveTunnelCommand, terminateTunnelProcess } from "./process.js";
 
+const QUICK_NOTICE = "Quick Tunnel is for testing only: its address changes on restart. Use /mcp for non-streaming requests; /sse and SSE streaming are not supported. Use a named tunnel for a stable address.";
+
 type Provider = "tuna" | "cloudflare" | "localtunnel";
 let child: ChildProcess | null = null;
 let generation = 0;
@@ -40,6 +42,7 @@ export async function startCliTunnel(provider: Provider): Promise<void> {
   const current = () => session === generation;
   try {
     const named = provider === "cloudflare" && config.cloudflare.mode === "named";
+    if (provider === "cloudflare" && !named) console.warn("[Tunnel] " + QUICK_NOTICE);
     if (named && !config.cloudflare.token) throw new Error("Cloudflare named tunnel requires a connector token from the Cloudflare dashboard.");
     const namedUrl = named ? namedCloudflareUrl() : "";
     const targetHost = ["0.0.0.0", "::", "[::]"].includes(config.host) ? "127.0.0.1" : config.host;
@@ -88,7 +91,7 @@ export async function startCliTunnel(provider: Provider): Promise<void> {
         if (timeout) clearTimeout(timeout);
         const limited = provider === "localtunnel" || (provider === "cloudflare" && !named);
         const warning = provider === "localtunnel" ? "Unverified endpoint: LocalTunnel may require a password/interstitial page that blocks MCP clients. Not recommended for permanent MCP use."
-          : provider === "cloudflare" && !named ? "Quick Tunnel does not support SSE; MCP streaming and /sse may fail. Use a named Cloudflare tunnel."
+          : provider === "cloudflare" && !named ? QUICK_NOTICE
           : undefined;
         tunnelStatus(provider, limited ? "unverified" : "connected", url, warning);
         console.log("[Tunnel] " + provider + " public address assigned: " + url + "/mcp" + (limited ? " (unverified)" : ""));

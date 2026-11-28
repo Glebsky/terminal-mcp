@@ -6,6 +6,8 @@ import * as path from "node:path";
 
 import { config } from "../config.js";
 import { auditLog } from "../utils/logger.js";
+import { buildProtectedSet, isInside, realTarget } from "../utils/protected.js";
+export { isInside } from "../utils/protected.js";
 import { decodeText, isUtf8Continuation, snippetAround, utf8SequenceLength } from "../utils/text.js";
 
 /**
@@ -48,45 +50,14 @@ function realpathOrResolve(target: string): string {
 
 const realFilesRoot = realpathOrResolve(config.filesRoot);
 
-/** True when `target` equals `root` or lies inside it. */
-export function isInside(root: string, target: string): boolean {
-  const relative = path.relative(root, target);
-  return relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
-}
+const protection = buildProtectedSet(config.serverPaths);
 
 function isSamePath(left: string, right: string): boolean {
   return path.relative(left, right) === "";
 }
 
-/**
- * Resolves symlinks/junctions of the deepest existing ancestor, so paths that do
- * not exist yet are checked too. Returns null for dangling links (unsafe to follow).
- */
-function realTarget(target: string): string | null {
-  let existing = path.resolve(target);
-  const rest: string[] = [];
-  for (;;) {
-    try {
-      const real = fsSync.realpathSync.native(existing);
-      return rest.length ? path.join(real, ...rest.reverse()) : real;
-    } catch {
-      try {
-        fsSync.lstatSync(existing);
-        return null; // Entry exists but cannot be resolved: dangling symlink/junction.
-      } catch {
-        // Does not exist: continue with the parent.
-      }
-      const parent = path.dirname(existing);
-      if (parent === existing) return path.resolve(target);
-      rest.push(path.basename(existing));
-      existing = parent;
-    }
-  }
-}
-
-function enforceSandbox(target: string, input: string): string {
+function enforceSandbox(target: string, input: string, real: string | null): string {
   if (config.fullAccess) return target;
-  const real = realTarget(target);
   if (!isInside(config.filesRoot, target) || real === null || !isInside(realFilesRoot, real)) {
     throw new Error(
       `Access denied: path "${input}" is outside sandbox directory (${config.filesRoot}). Set FULL_ACCESS=true to permit arbitrary paths.`,
@@ -100,7 +71,7 @@ export function getActiveWorkingDir(scope: WorkspaceScope = globalScope): string
 }
 
 export function setActiveWorkingDir(newDir: string, scope: WorkspaceScope = globalScope): string {
-  const resolved = resolveTarget(newDir, { cwd: scope.get() });
+  const resolved = resolveTarget(newDir, { cwd: scope.get(), tool: "workspace_set_cwd" });
   let stat: Stats;
   try {
     stat = fsSync.statSync(resolved);
@@ -129,13 +100,25 @@ export function setActiveWorkingDir(newDir: string, scope: WorkspaceScope = glob
 export interface ResolveOptions {
   cwd?: string;
   mutating?: boolean;
+  tool?: string;
+  intent?: "content" | "metadata" | "tree";
+}
+
+function authorize(target: string, input: string, options: ResolveOptions): string {
+  const real = realTarget(target);
+  enforceSandbox(target,input,real);
+  if (options.intent !== "metadata" && protection.blocked(target,options.intent === "tree",real)) {
+    auditLog("protected_denied", { tool: options.tool ?? "filesystem", path: target });
+    throw new Error(`Access denied: "${target}" is protected server configuration`);
+  }
+  return target;
 }
 
 export function resolveTarget(input: string, options: ResolveOptions = {}): string {
   const base = options.cwd ?? currentWorkingDir;
   let cleaned = (input || "").trim();
   if (!cleaned) {
-    return enforceSandbox(base, input);
+    return authorize(base, input, options);
   }
 
   // Strip leading slash from Windows absolute paths like "/C:/foo"
@@ -154,7 +137,7 @@ export function resolveTarget(input: string, options: ResolveOptions = {}): stri
       : fromCwd;
   }
 
-  return enforceSandbox(target, input);
+  return authorize(target, input, options);
 }
 
 // Per-path FIFO queues for mutating operations (SPEC-005 FR-1.1). All keys of one call are taken
@@ -243,7 +226,7 @@ export async function readFile(
   length?: number,
   cwd?: string,
 ) {
-  const target = resolveTarget(inputPath, { cwd });
+  const target = resolveTarget(inputPath, { cwd, tool: "file_read" });
   const handle = await fs.open(target, "r");
 
   try {
@@ -304,7 +287,7 @@ export async function writeFile(
   append = false,
   cwd?: string,
 ) {
-  const target = resolveTarget(inputPath, { cwd, mutating: true });
+  const target = resolveTarget(inputPath, { cwd, mutating: true, tool: "file_write" });
   const buffer = Buffer.from(data, encoding);
 
   if (buffer.length > config.maxFileBytes) {
@@ -333,7 +316,7 @@ export async function replaceInFile(
   allowMultiple = false,
   cwd?: string,
 ) {
-  const target = resolveTarget(inputPath, { cwd, mutating: true });
+  const target = resolveTarget(inputPath, { cwd, mutating: true, tool: "file_replace" });
   return withPathLock([target], () => replaceLocked(target, inputPath, targetContent, replacementContent, allowMultiple));
 }
 
@@ -402,6 +385,7 @@ export interface FileEntry {
   path: string;
   type: "file" | "directory" | "symlink";
   size?: number;
+  protected?: true;
 }
 
 // Recursive listing/search never descends into these directories.
@@ -415,7 +399,7 @@ export async function listFiles(
   cwd?: string,
   offset = 0,
 ) {
-  const root = resolveTarget(inputPath, { cwd });
+  const root = resolveTarget(inputPath, { cwd, tool: "file_list", intent: "metadata" });
   const entries: FileEntry[] = [];
   let truncated = false;
   // Entries before `offset` are walked but not returned, so a caller can page with next_offset.
@@ -443,7 +427,10 @@ export async function listFiles(
         }
       }
 
-      if (include) entries.push(item);
+      if (include) {
+        if (protection.blocked(fullPath)) item.protected = true;
+        entries.push(item);
+      }
       // Symlinked directories are reported but not followed.
       if (recursive && entry.isDirectory() && !SKIPPED_LIST_DIRS.has(entry.name)) {
         await visit(fullPath);
@@ -454,6 +441,7 @@ export async function listFiles(
   await visit(root);
   return {
     root,
+    ...(protection.blocked(root) ? { protected: true } : {}),
     entries,
     truncated,
     ...(truncated ? { next_offset: offset + entries.length } : {}),
@@ -532,7 +520,7 @@ export async function searchFiles(
   maxResults = 100,
   cwd?: string,
 ) {
-  const root = resolveTarget(inputPath, { cwd });
+  const root = resolveTarget(inputPath, { cwd, tool: "file_search", intent: "metadata" });
   const results: SearchMatch[] = [];
   const queryRegex = query ? compileSearchQuery(query, caseSensitive) : null;
   let truncated = false;
@@ -542,6 +530,12 @@ export async function searchFiles(
   const skip = (target: string, reason: string) => {
     skippedTotal++;
     if (skipped.length < 50) skipped.push({ path: target, reason });
+  };
+  const skipPrivate = (p: string) => {
+    if (!protection.blocked(p)) return false;
+    skip(p, "protected");
+    auditLog("protected_denied", {tool:"file_search", path:p});
+    return true;
   };
   const errorCode = (error: unknown) => (error as NodeJS.ErrnoException).code ?? "error";
 
@@ -565,6 +559,7 @@ export async function searchFiles(
         return;
       }
       const fullPath = path.join(directory, entry.name);
+      if (skipPrivate(fullPath)) continue;
 
       if (entry.isDirectory()) {
         if (SKIPPED_SEARCH_DIRS.has(entry.name)) continue;
@@ -612,7 +607,7 @@ export async function searchFiles(
     }
   };
 
-  await visit(root);
+  if (!skipPrivate(root)) await visit(root);
 
   auditLog("file_search", {
     path: root,
@@ -631,7 +626,7 @@ export async function searchFiles(
 }
 
 export async function statPath(inputPath: string, cwd?: string) {
-  const target = resolveTarget(inputPath, { cwd });
+  const target = resolveTarget(inputPath, { cwd, tool: "file_stat", intent: "metadata" });
   const linkStat = await fs.lstat(target);
   const isSymlink = linkStat.isSymbolicLink();
   let stat: Stats = linkStat;
@@ -644,6 +639,7 @@ export async function statPath(inputPath: string, cwd?: string) {
 
   return {
     path: target,
+    ...(protection.blocked(target) ? { protected: true } : {}),
     type: isSymlink ? "symlink" : stat.isDirectory() ? "directory" : "file",
     target_type: isSymlink ? (stat.isDirectory() ? "directory" : stat === linkStat ? "missing" : "file") : undefined,
     link_target: linkTarget,
@@ -655,7 +651,7 @@ export async function statPath(inputPath: string, cwd?: string) {
 }
 
 export async function createDirectory(inputPath: string, cwd?: string) {
-  const target = resolveTarget(inputPath, { cwd, mutating: true });
+  const target = resolveTarget(inputPath, { cwd, mutating: true, tool: "file_mkdir" });
   await fs.mkdir(target, { recursive: true });
   auditLog("file_mkdir", { path: target });
   return { path: target, created: true };
@@ -687,8 +683,8 @@ export async function movePath(
   overwrite = false,
   cwd?: string,
 ) {
-  const from = resolveTarget(source, { cwd, mutating: true });
-  const to = resolveTarget(destination, { cwd, mutating: true });
+  const from = resolveTarget(source, { cwd, mutating: true, tool: "file_move", intent: "tree" });
+  const to = resolveTarget(destination, { cwd, mutating: true, tool: "file_move", intent: "tree" });
 
   if (from === to) {
     throw new Error("Source and destination are the same path");
@@ -740,7 +736,7 @@ async function moveLocked(from: string, to: string, overwrite: boolean) {
 }
 
 export async function deletePath(inputPath: string, recursive = false, scope: WorkspaceScope = globalScope) {
-  const target = resolveTarget(inputPath, { cwd: scope.get(), mutating: true });
+  const target = resolveTarget(inputPath, { cwd: scope.get(), mutating: true, tool: "file_delete", intent: "tree" });
   const parsed = path.parse(target);
 
   if (target === parsed.root) {

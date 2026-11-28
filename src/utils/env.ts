@@ -19,9 +19,14 @@ export function scrubbedEnv(extra: Record<string, string> = {}): NodeJS.ProcessE
   return { ...env, ...extra };
 }
 
-/** Current values of sensitive variables (used for log redaction). */
+/** Effective credential values: bearer/basic keep significant whitespace; provider tokens are trimmed in config.ts. */
 export function sensitiveValues(): string[] {
-  return Object.entries(process.env)
-    .filter(([key, value]) => key !== "DOTENV_PATH" && isSensitiveEnvName(key) && typeof value === "string" && value.trim().length >= 8)
-    .map(([, value]) => (value as string).trim());
+  const values = new Set<string>();
+  for (const [name, raw] of Object.entries(process.env)) {
+    const key = name.toUpperCase();
+    if (!raw || key === "DOTENV_PATH" || !isSensitiveEnvName(key)) continue;
+    const value = key === "MCP_API_KEY" || key === "BASIC_AUTH_PASSWORD" ? raw : raw.trim();
+    if (value.length >= 8) values.add(value);
+  }
+  return [...values].sort((a,b) => b.length-a.length);
 }

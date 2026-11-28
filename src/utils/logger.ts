@@ -3,6 +3,15 @@ import { sensitiveValues } from "./env.js";
 
 const REDACTED = "[REDACTED]";
 
+// Tool results are not logs: only replace configured, literal values. Never rewrite source code by pattern.
+// Initialize on first result, after dotenv has loaded. The process configuration is fixed until restart.
+let outputSecrets: string[] | undefined;
+export function redactOutput(text: string): string {
+  const values = outputSecrets ??= sensitiveValues();
+  for (const value of values) if (text.includes(value)) text = text.split(value).join(REDACTED);
+  return text;
+}
+
 const SECRET_PATTERNS: Array<[RegExp, string]> = [
   [/(authorization\s*[:=]\s*["']?bearer\s+)[^\s"']+/gi, "$1" + REDACTED],
   [/(x-api-key\s*[:=]\s*["']?)[^\s"']+/gi, "$1" + REDACTED],
@@ -14,6 +23,8 @@ export function redact(text: string): string {
   let output = text;
   for (const secret of sensitiveValues()) {
     output = output.split(secret).join(REDACTED);
+    const trimmed = secret.trim(); // Preserve the more conservative audit policy.
+    if (trimmed.length >= 8 && trimmed !== secret) output = output.split(trimmed).join(REDACTED);
   }
   for (const [pattern, replacement] of SECRET_PATTERNS) {
     output = output.replace(pattern, replacement);

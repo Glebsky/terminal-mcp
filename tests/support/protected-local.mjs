@@ -1,0 +1,33 @@
+// Non-networked subprocess, supplied only a throwaway directory and synthetic configuration.
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+const root=process.cwd();
+assert.match(path.basename(root),/^mcp-conf-[\w-]+$/);
+assert.equal(path.relative(await fs.realpath(os.tmpdir()),path.dirname(await fs.realpath(root))),'');
+assert.equal(process.env.FULL_ACCESS,'true');
+const {statPath,resolveTarget,readFile,writeFile,movePath}=await import('../../dist/tools/filesystem.js');
+const {normalizeBrowserUrl}=await import('../../dist/tools/browser.js');
+const {textResult,errorResult}=await import('../../dist/tools/types.js');
+const priv=process.env.PROTECTED_PATHS;
+assert.equal((await statPath(priv)).protected,true);
+assert.throws(()=>resolveTarget(priv),/protected server configuration/);
+assert.throws(()=>normalizeBrowserUrl(pathToFileURL(priv).href),/protected server configuration/);
+assert.equal(resolveTarget(path.join(root,'ordinary.txt')),path.join(root,'ordinary.txt'));
+const configFile=process.env.DOTENV_PATH;
+await assert.rejects(readFile(configFile),/protected server configuration/);
+await assert.rejects(writeFile(configFile,'blocked'),/protected server configuration/);
+await assert.rejects(movePath(configFile,path.join(root,'renamed')), /protected server configuration/);
+const alias=path.join(root,'config-alias');
+await fs.symlink(path.dirname(configFile),alias,process.platform==='win32'?'junction':'dir');
+assert.equal((await statPath(path.join(alias,path.basename(configFile)))).protected,true);
+assert.throws(()=>resolveTarget(path.join(alias,'future-file')), /protected server configuration/);
+assert.equal(resolveTarget(priv+'-ordinary'),priv+'-ordinary');
+const marker=process.env.BASIC_AUTH_PASSWORD;
+const r=JSON.parse(errorResult(new Error('Sample: '+marker)).content[0].text);
+assert.equal(r.error,'Sample: [REDACTED]');
+assert.deepEqual(JSON.parse(textResult({stdout:'Sample: '+marker,stderr:'password: example'}).content[0].text),{stdout:'Sample: [REDACTED]',stderr:'password: example'});
+assert.equal(textResult(marker.trim()).content[0].text,marker.trim()); // Only the exact configured password is private.
+assert.deepEqual(JSON.parse(textResult({[marker]:marker}).content[0].text),{'[REDACTED]':'[REDACTED]'});

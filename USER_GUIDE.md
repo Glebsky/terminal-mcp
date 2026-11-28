@@ -20,7 +20,7 @@ Complete illustrated guide to installation, configuration, architecture, and usa
    - [Sandbox vs Full Host Access](#sandbox-vs-full-host-access)
    - [Transports: Streamable HTTP and MCP SSE](#transports-streamable-http-and-mcp-sse)
    - [Tunneling: Ngrok and Cloudflare](#tunneling-ngrok-and-cloudflare)
-6. [MCP Tools Reference (20 Tools)](#6-mcp-tools-reference-20-tools)
+6. [MCP Tools Reference (24 Tools)](#6-mcp-tools-reference-24-tools)
 7. [FAQ and Troubleshooting](#7-faq-and-troubleshooting)
 
 ---
@@ -249,7 +249,7 @@ The server supports both Model Context Protocol connection methods:
 
 ---
 
-## 6. MCP Tools Reference (20 Tools)
+## 6. MCP Tools Reference (24 Tools)
 
 ### 🖥️ 1. Terminal Execution
 | Tool | Description | Parameters |
@@ -285,7 +285,11 @@ The server supports both Model Context Protocol connection methods:
 | `browser_type` | Type text into an input or textarea element with optional field clearing | `selector`, `text`, `clear`, `timeout_ms` |
 | `browser_get_content` | Extract rendered text, raw DOM HTML, or page title | `type` (`text`/`html`/`title`), `selector`, `offset` / `length` (pages; continue from `next_offset`) |
 | `browser_screenshot` | Capture full-page or viewport screenshots to a PNG file or return base64 | `path`, `full_page` |
-| `browser_close` | Close active browser instance and release resources | *(none)* |
+| `browser_connect` | Connect to a browser profile explicitly chosen by the owner. | `endpoint`, `launch_if_missing`, `browser`, `timeout_ms` |
+| `browser_list_tabs` | List tabs in this browser session and identify the active tab. | none |
+| `browser_new_tab` | Open a new tab, optionally navigate, and select it. | `url` |
+| `browser_select_tab` | Select a tab by index, URL or title; optionally bring it to the front. | `index`, `url_contains`, `title_contains`, `bring_to_front` |
+| `browser_close` | Close a browser the server launched, or detach from an existing profile without closing its tabs. | none |
 
 Detailed JSON schemas and specifications are available in [`AGENTS.md`](AGENTS.md).
 

@@ -42,6 +42,7 @@ async function main(){
      assert.equal(await req(port,hostname),401); assert.equal(await req(port,'untrusted.example'),421);
      await waitFor(()=>events.find(x=>x.state==='error')); assert.equal(await req(port,hostname),421);
     }
+    if(provider==='cloudflare') assert.ok(/Quick Tunnel is for testing only[^\r\n]*\/mcp[^\r\n]*\/sse/i.test(logs), 'missing Quick Tunnel test-only startup notice');
     assert(!logs.includes(key)); assert(!logs.includes('fake-secret')); console.log(provider+': status, isolation and host validation OK');
    } finally { if(child.connected)child.send({type:'shutdown'}); await waitFor(()=>child.exitCode!==null,5000); }
   }

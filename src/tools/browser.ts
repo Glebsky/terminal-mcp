@@ -152,7 +152,7 @@ async function waitForCdp(endpoint: string, timeoutMs: number): Promise<boolean>
  * Normalize and validate a browser URL. Only http(s), about:blank and file URLs are
  * allowed; file URLs must point inside FILES_ROOT unless FULL_ACCESS=true.
  */
-export function normalizeBrowserUrl(input: string): string {
+export function normalizeBrowserUrl(input: string, tool = "browser_navigate"): string {
   const trimmed = input.trim();
   const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) && !/^[a-z0-9.-]+:\d+(?:[/?#]|$)/i.test(trimmed);
   const candidate = hasScheme ? trimmed : "http://" + trimmed;
@@ -165,7 +165,7 @@ export function normalizeBrowserUrl(input: string): string {
   if (parsed.protocol === "http:" || parsed.protocol === "https:") return parsed.href;
   if (parsed.href === "about:blank") return parsed.href;
   if (parsed.protocol === "file:") {
-    resolveTarget(fileURLToPath(parsed)); // Enforces the FILES_ROOT sandbox.
+    resolveTarget(fileURLToPath(parsed), { tool }); // Both the workspace sandbox and server-owned path policy.
     return parsed.href;
   }
   throw new Error("Unsupported URL scheme \"" + parsed.protocol + "\". Only http, https, file and about:blank are allowed.");
@@ -362,11 +362,10 @@ export class BrowserManager {
    */
   public async open(options: BrowserOpenOptions) {
     const { url, headless = false, browser = "chrome" } = options;
+    const fullUrl = normalizeBrowserUrl(url, "browser_open");
     await this.ensureBrowser(headless, browser);
     // When attached to the user's browser, never hijack the tab they are using: open a new one.
     const page = this.mode === "connected" ? await this.newTabPage() : await this.ensurePage(headless, browser);
-
-    const fullUrl = normalizeBrowserUrl(url);
 
     const response = await page.goto(fullUrl, {
       waitUntil: "domcontentloaded",
@@ -392,9 +391,8 @@ export class BrowserManager {
    */
   public async navigate(options: BrowserNavigateOptions) {
     const { url, waitUntil = "load", timeoutMs = 30_000 } = options;
+    const fullUrl = normalizeBrowserUrl(url, "browser_navigate");
     const page = await this.ensurePage();
-
-    const fullUrl = normalizeBrowserUrl(url);
 
     const response = await page.goto(fullUrl, {
       waitUntil,
@@ -542,6 +540,7 @@ export class BrowserManager {
    */
   public async screenshot(options: BrowserScreenshotOptions) {
     const { path: outputPath, fullPage = false } = options;
+    const savedPath = outputPath ? resolveTarget(outputPath, { cwd: options.cwd, mutating: true, tool: "browser_screenshot" }) : undefined;
     const page = await this.ensurePage();
 
     const buffer = await page.screenshot({
@@ -549,10 +548,7 @@ export class BrowserManager {
       type: "png",
     });
 
-    let savedPath: string | undefined;
-
-    if (outputPath) {
-      savedPath = resolveTarget(outputPath, { cwd: options.cwd, mutating: true });
+    if (savedPath) {
       await fs.mkdir(path.dirname(savedPath), { recursive: true });
       await fs.writeFile(savedPath, buffer);
     }
@@ -738,10 +734,11 @@ export class BrowserManager {
    * Open a new tab (optionally navigating to a URL) and make it active.
    */
   public async newTab(options: BrowserNewTabOptions = {}) {
+    const fullUrl = options.url ? normalizeBrowserUrl(options.url, "browser_new_tab") : undefined;
     const page = await this.newTabPage();
     let status: number | null = null;
-    if (options.url) {
-      const response = await page.goto(normalizeBrowserUrl(options.url), { waitUntil: "domcontentloaded", timeout: 30_000 });
+    if (fullUrl) {
+      const response = await page.goto(fullUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
       status = response ? response.status() : null;
     }
     await page.bringToFront().catch(() => {});
