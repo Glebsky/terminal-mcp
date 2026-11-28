@@ -31,14 +31,16 @@ export async function targetFor(t) {
 // For external mode the owner deliberately supplies a dedicated local test instance. Check both
 // the named temp-root convention and a random disk round trip before any state-changing MCP call.
 async function verifyRoot(input) {
-  const parent = await fs.realpath(os.tmpdir());
+  const temp = path.resolve(os.tmpdir()), parent = await fs.realpath(temp);
   if (typeof input !== 'string' || !path.isAbsolute(input) || !/^mcp-conf-[\w-]+$/.test(path.basename(input))
-      || path.relative(path.resolve(os.tmpdir()), path.dirname(path.resolve(input))) !== '') {
+      || ![temp,parent].some(p => path.relative(p,path.dirname(path.resolve(input))) === '')) {
     throw new Error('Refusing changes outside a dedicated mcp-conf-* directory directly under the system temp folder');
   }
   const root = await fs.realpath(input);
   if (path.relative(parent,path.dirname(root)) !== '' || (await fs.lstat(input)).isSymbolicLink()) throw new Error('Fixture root must be a real temporary directory');
-  return root;
+  // Check physical containment above, but send paths under FILES_ROOT exactly as the server spells it.
+  // Windows can spell the TEMP parent with an alias (for example an 8.3 name).
+  return { root:path.resolve(input), physical:root };
 }
 export async function scenario(t) {
   let srv, client, dir, previous, moved = false;
@@ -53,9 +55,12 @@ export async function scenario(t) {
   srv = externalTarget() ?? await startServer();
   client = await connect(srv);
   const scope = await call(client,'workspace_get_cwd');
-  const root = await verifyRoot(scope.files_root);
+  const { root, physical } = await verifyRoot(scope.files_root);
   previous = scope.cwd;
-  if (!previous || path.relative(root,path.resolve(previous)) !== '') throw new Error('Dedicated fixture must start at its own root');
+  if (typeof previous !== 'string' || !path.isAbsolute(previous)
+      || ![root,physical].some(p => path.relative(p,path.resolve(previous)) === '')) {
+    throw new Error('Dedicated fixture must start at its own root');
+  }
   dir = await fs.mkdtemp(path.join(root,'case-'));
   const token = randomUUID(), proof = path.join(dir,'fixture.txt');
   await fs.writeFile(proof,token,{flag:'wx'});
