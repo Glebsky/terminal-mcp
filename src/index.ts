@@ -2,6 +2,7 @@ import { config } from "./config.js";
 import { createApp, getActiveSessions } from "./server.js";
 import { setMonitoringEnabled } from "./monitor.js";
 import { startTunnel, stopTunnel } from "./tunnel/index.js";
+import { emit, onCommand } from "./control.js";
 
 const app = createApp();
 
@@ -11,8 +12,7 @@ const httpServer = app.listen(config.port, config.host, async (error?: Error) =>
     const code = (error as NodeJS.ErrnoException).code || "LISTEN_FAILED";
     console.error(`Cannot listen on ${config.host}:${config.port}: ${code} ${error.message}`);
     const exit = () => process.exit(1);
-    if (process.connected && process.send) process.send({ type: "server:error", code, port: config.port, message: error.message }, exit);
-    else exit();
+    emit({ type: "server:error", code, port: config.port, message: error.message }, exit);
     return;
   }
   console.log(`MCP Terminal listening on http://${config.host}:${config.port}/mcp`);
@@ -20,7 +20,7 @@ const httpServer = app.listen(config.port, config.host, async (error?: Error) =>
     `Filesystem mode: ${config.fullAccess ? "FULL HOST ACCESS (UNRESTRICTED)" : `restricted to ${config.filesRoot}`}`,
   );
 
-  if (process.connected && process.send) process.send({ type: "server:ready" }, () => {});
+  emit({ type: "server:ready" });
   await startTunnel();
 });
 
@@ -66,12 +66,8 @@ process.on("SIGTERM", () => {
   void gracefulShutdown("SIGTERM");
 });
 
-process.on("message", (msg: unknown) => {
-  if (typeof msg === "object" && msg !== null && (msg as { type?: string }).type === "monitor:set") {
-    setMonitoringEnabled((msg as { enabled?: boolean }).enabled === true);
-  }
-  if (typeof msg === "object" && msg !== null && (msg as { type?: string }).type === "shutdown") {
-    void gracefulShutdown("IPC");
-  }
+onCommand((msg) => {
+  if (msg.type === "monitor:set") setMonitoringEnabled(msg.enabled === true);
+  if (msg.type === "shutdown") void gracefulShutdown("IPC");
 });
 
