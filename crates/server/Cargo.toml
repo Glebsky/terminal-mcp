@@ -1,0 +1,16 @@
+[package]
+name = "mcp-terminal-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+mcp-terminal-core = { path = "../core" }
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio"] }
+rmcp = { version = "=3.12.0", default-features = false, features = ["server", "transport-streamable-http-server"] }
+serde_json = "1"
+subtle = "2.6"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tower-http = { version = "0.6", features = ["limit"] }

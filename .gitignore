@@ -18,3 +18,5 @@ workspace/
 
 
 
+# Cargo workspace outputs (tracked sources and Cargo.lock stay in Git).
+/target/

@@ -1,0 +1,49 @@
+name: Rust core bootstrap
+on:
+  push:
+    paths:
+      - 'Cargo.*'
+      - 'crates/**'
+      - 'contracts/**'
+      - 'tests/rust/**'
+      - 'tests/conformance/_client.mjs'
+      - 'package*.json'
+      - '.github/workflows/rust-core.yml'
+  pull_request:
+    paths:
+      - 'Cargo.*'
+      - 'crates/**'
+      - 'contracts/**'
+      - 'tests/rust/**'
+      - 'tests/conformance/_client.mjs'
+      - 'package*.json'
+      - '.github/workflows/rust-core.yml'
+permissions:
+  contents: read
+
+jobs:
+  native-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install the existing locked JS client (no install hooks)
+        run: npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+      - name: Select the tested Windows toolchain
+        run: rustup toolchain install 1.100.1-x86_64-pc-windows-msvc --profile minimal --component rustfmt --no-self-update
+      - name: Check formatting
+        run: cargo +1.100.1 fmt --all -- --check
+      - name: Build the native process
+        run: cargo +1.100.1 build --workspace --locked
+      - name: Test the domain and parent control pipe
+        run: cargo +1.100.1 test --workspace --locked
+      - name: Exercise both protocol revisions and the project's TS SDK against the native binary
+        shell: pwsh
+        run: |
+          $env:RUST_MCP_BIN = (Resolve-Path 'target/debug/mcp-terminal-server.exe').Path
+          node --test tests/rust/bootstrap.test.mjs
