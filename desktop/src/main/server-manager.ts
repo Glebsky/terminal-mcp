@@ -4,9 +4,18 @@ import * as fs from "node:fs/promises";
 import * as crypto from "node:crypto";
 import dotenv from "dotenv";
 import type { EnvConfig, LogEntry, ServerStatus, MonitorSnapshot } from "../types.js";
-import { createLineBuffer } from "./line-buffer.js";
+import { createLineBuffer, MAX_CONTROL_FRAME_CHARS } from "./line-buffer.js";
 /** Must match the server's acknowledgement phrase for AUTH_METHODS=none. */
 const NO_AUTH_ACK = "I_UNDERSTAND_ANYONE_CAN_CONTROL_THIS_PC";
+
+type ParentCommand = { type: "monitor:set"; enabled: boolean } | { type: "shutdown" };
+
+function writeControl(child: ChildProcess | null, command: ParentCommand): boolean {
+  const pipe = child?.stdin;
+  if (!pipe?.writable || pipe.writableEnded || pipe.destroyed) return false;
+  try { pipe.write(JSON.stringify(command) + "\n"); return true; }
+  catch { return false; } // The child can exit between the check and the write.
+}
 
 export class ServerManager {
   private process: ChildProcess | null = null;
@@ -28,7 +37,7 @@ export class ServerManager {
   public setMonitorCallback(callback: (snapshot: MonitorSnapshot) => void) { this.monitorCallback = callback; }
   public setMonitoring(enabled: boolean) {
     this.monitoringEnabled = enabled;
-    if (this.process?.connected) this.process.send({ type: "monitor:set", enabled });
+    writeControl(this.process, { type: "monitor:set", enabled });
   }
   private projectRoot: string;
   private configDir: string;
@@ -321,35 +330,22 @@ export class ServerManager {
           NGROK_TOKEN: "",
           DOTENV_PATH: envPath,
           ELECTRON_RUN_AS_NODE: "1",
+          MCP_CONTROL: "stdio",
           FORCE_COLOR: "1",
         },
-        stdio: ["pipe", "pipe", "pipe", "ipc"],
+        stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
       });
 
-      this.process.on("message", (message: unknown) => {
-        if (message && typeof message === "object" && (message as {type?: string}).type === "server:ready") this.updateStatus({ state: "running" });
-        if (message && typeof message === "object" && (message as {type?: string}).type === "server:error") {
-          const m = message as { code?: string; port?: number; message?: string };
-          const error = m.code === "EADDRINUSE"
-            ? `Port ${m.port} is already in use by another process. Stop it or choose another port in Settings.`
-            : `Server could not start: ${m.code || "error"} ${m.message || ""}`.trim();
-          this.updateStatus({ state: "error", error });
-          this.emitLog(error, "error");
-        }
-        if (message && typeof message === "object" && (message as {type?: string}).type === "tunnel:status") {
-          const m = message as {provider: ServerStatus["tunnelProvider"]; state: ServerStatus["tunnelState"]; url?: string; error?: string};
-          this.updateStatus({ tunnelProvider: m.provider, tunnelState: m.state, tunnelUrl: m.url, tunnelError: m.error, ngrokUrl: m.provider === "ngrok" ? m.url : undefined });
-        }
-        if (this.monitoringEnabled && message && typeof message === "object" && (message as {type?: string}).type === "monitor:snapshot") {
-          this.monitorCallback?.((message as {snapshot: MonitorSnapshot}).snapshot);
-        }
+      // EPIPE is normal when the server exits while a UI command is in flight.
+      this.process.stdin?.on("error", (error: NodeJS.ErrnoException) => {
+        if (error.code !== "EPIPE" && error.code !== "ERR_STREAM_DESTROYED") this.emitLog("Server control input closed.", "warn");
       });
-      if (this.process.connected) this.process.send({ type: "monitor:set", enabled: this.monitoringEnabled });
+      writeControl(this.process, { type: "monitor:set", enabled: this.monitoringEnabled });
 
       // Pipe chunks split lines and UTF-8 characters anywhere: decode as a stream (setEncoding uses a
       // StringDecoder) and pass on only whole lines; stderr lines of one chunk stay one entry (SPEC-006 FR-6).
-      const stdoutLines = createLineBuffer((text) => this.parseOutput(text));
+      const stdoutLines = createLineBuffer((text) => this.parseOutput(text), "[CTL] ");
       this.process.stdout?.setEncoding("utf8");
       this.process.stdout?.on("data", (chunk: string) => stdoutLines.push(chunk));
       this.process.stdout?.on("end", () => stdoutLines.flush());
@@ -365,7 +361,7 @@ export class ServerManager {
         const wasRunning = this.status.state === "running" || this.status.state === "starting";
         this.process = null;
         this.updateStatus({
-          // A startup error reported over IPC (server:error) stays visible after the exit.
+          // A structured startup error stays visible after the child exits.
           state: this.status.state === "error" || (code !== 0 && wasRunning) ? "error" : "offline",
           ngrokUrl: undefined, tunnelUrl: undefined, tunnelState: "disabled", tunnelError: undefined,
         });
@@ -431,16 +427,7 @@ export class ServerManager {
 
       proc.once("close", onDone);
 
-      // Try sending IPC shutdown message first
-      try {
-        if (proc.connected) {
-          proc.send({ type: "shutdown" });
-        } else {
-          proc.kill("SIGINT");
-        }
-      } catch {
-        proc.kill("SIGTERM");
-      }
+      if (!writeControl(proc, { type: "shutdown" })) proc.kill("SIGTERM");
     });
   }
 
@@ -451,10 +438,47 @@ export class ServerManager {
     return await this.start();
   }
 
+  // Only stdout frames change status; unknown frames are ignored for forward compatibility.
+  // Never place a malformed frame or monitor payload in the user-visible log.
+  private handleControlLine(json: string): void {
+    let value: unknown;
+    try { value = JSON.parse(json); } catch { return; }
+    if (!value || typeof value !== "object" || !("type" in value)) return;
+    const m = value as Record<string, unknown>;
+    switch (m.type) {
+      case "server:ready": this.updateStatus({ state: "running" }); break;
+      case "server:error": {
+        const code = typeof m.code === "string" ? m.code : "error";
+        const error = code === "EADDRINUSE" && typeof m.port === "number"
+          ? `Port ${m.port} is already in use by another process. Stop it or choose another port in Settings.`
+          : `Server could not start: ${code} ${typeof m.message === "string" ? m.message : ""}`.trim();
+        this.updateStatus({ state: "error", error });
+        this.emitLog(error, "error"); break;
+      }
+      case "tunnel:status": {
+        const provider = m.provider as ServerStatus["tunnelProvider"], state = m.state as ServerStatus["tunnelState"];
+        if (!["none", "ngrok", "tuna", "cloudflare", "localtunnel"].includes(provider) || !["disabled", "starting", "connected", "unverified", "error"].includes(state)) return;
+        const url = typeof m.url === "string" ? m.url : undefined;
+        this.updateStatus({ tunnelProvider: provider, tunnelState: state, tunnelUrl: url,
+          tunnelError: typeof m.error === "string" ? m.error : undefined, ngrokUrl: provider === "ngrok" ? url : undefined });
+        break;
+      }
+      case "monitor:snapshot": {
+        const snap = m.snapshot as MonitorSnapshot | undefined;
+        if (this.monitoringEnabled && snap && typeof snap.sampledAt === "number" && Array.isArray(snap.recentClients) && Array.isArray(snap.operations)) this.monitorCallback?.(snap);
+        break;
+      }
+    }
+  }
+
   private parseOutput(text: string) {
     const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
 
     for (const line of lines) {
+      if (line.startsWith("[CTL] ")) {
+        if (line.length <= MAX_CONTROL_FRAME_CHARS) this.handleControlLine(line.slice(6));
+        continue;
+      }
       if (line.startsWith("[AUDIT]")) {
         const match = line.match(/\[AUDIT\]\s*([^|]+)\|\s*([^|]+)\|\s*(.*)/);
         if (match) {
@@ -471,8 +495,7 @@ export class ServerManager {
         }
       }
 
-      if (line.includes("MCP Terminal listening on")) {
-        this.updateStatus({ state: "running" });
+      if (line.startsWith("MCP Terminal listening on")) {
         this.emitLog(line, "mcp");
         continue;
       }

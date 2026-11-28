@@ -1,4 +1,5 @@
 import { config } from "../config.js";
+import { emit } from "../control.js";
 export type TunnelState = "disabled" | "starting" | "connected" | "unverified" | "error";
 export interface TunnelSnapshot { provider: string; state: TunnelState; url?: string; error?: string }
 let temporaryHost: string | undefined;
@@ -22,5 +23,5 @@ export function tunnelStatus(provider: string, state: TunnelState, url?: string,
     if (!config.allowedHosts.has(host)) { config.allowedHosts.add(host); temporaryHost = host; }
   }
   snapshot = { provider, state, ...(origin ? { url: origin } : {}), ...(error ? { error: redactTunnelError(error) } : {}) };
-  if (process.connected && process.send) process.send({ type: "tunnel:status", ...snapshot }, () => {});
+  emit({ type: "tunnel:status", ...snapshot });
 }

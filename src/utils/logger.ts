@@ -21,7 +21,7 @@ export function redact(text: string): string {
   return output;
 }
 
-function redactValue(value: unknown): unknown {
+export function redactValue(value: unknown): unknown {
   if (typeof value === "string") return redact(value);
   if (Array.isArray(value)) return value.map(redactValue);
   if (value && typeof value === "object") {

@@ -1,6 +1,6 @@
 # SPEC-009 · Контракт инструментов, тесты «чёрного ящика», CI и нейтральный протокол UI ↔ сервер
 
-- **Статус:** Черновик (на утверждении)
+- **Статус:** утверждена; реализация проверена локально в ветке `spec-009-contract-ci`. Первый запуск GitHub Actions ещё не подтверждён.
 - **Дата:** 2026-11-28
 - **Основание:** `docs/audit/2026-11-28-zeroide-parity.md` (разделы 9 и 12; решение: Rust-ядро + Tauri 2, поэтапно)
 - **Область:** `contracts/` (новое), `tests/conformance/` (новое), `scripts/` (новое), `src/index.ts`, `src/monitor.ts`, `src/tunnel/status.ts`, `desktop/src/main/server-manager.ts`, `.github/workflows/ci.yml` (новое), `package.json`
@@ -58,13 +58,13 @@
 
 ## 4. План задач
 
-- [ ] T1. `src/control.ts` + перевод `src/index.ts`, `src/monitor.ts`, `src/tunnel/status.ts`; тест: при `MCP_CONTROL=stdio` stdout содержит `[CTL] {"type":"server:ready"}`, а `{"type":"shutdown"}` в stdin завершает процесс с кодом 0
-- [ ] T2. `server-manager.ts` на stdio-протокол; ручная проверка в `npm run app:dev`: запуск, монитор, туннель, стоп, выход
-- [ ] T3. `scripts/contract-dump.mjs` и `contracts/tools.json` (24 инструмента)
-- [ ] T4. `tests/conformance/` по FR-2.3 (сначала тест падает на заведомо неверном снимке, потом зелёный)
-- [ ] T5. `contracts/control.md`
+- [x] T1. `src/control.ts` + перевод `src/index.ts`, `src/monitor.ts`, `src/tunnel/status.ts`; тест: при `MCP_CONTROL=stdio` stdout содержит `[CTL] {"type":"server:ready"}`, а `{"type":"shutdown"}` в stdin завершает процесс с кодом 0
+- [x] T2. `server-manager.ts` на stdio-протокол; ручная проверка в `npm run app:dev`: запуск, монитор, туннель, стоп, выход
+- [x] T3. `scripts/contract-dump.mjs` и `contracts/tools.json` (24 инструмента)
+- [x] T4. `tests/conformance/` по FR-2.3 (сначала тест падает на заведомо неверном снимке, потом зелёный)
+- [x] T5. `contracts/control.md`
 - [ ] T6. `.github/workflows/ci.yml`; первый прогон на ветке
-- [ ] T7. `npm run check`, `npm run build:renderer`, `npm run test:conformance`, `npm run test:monitor` локально
+- [x] T7. `npm run check`, `npm run build:renderer`, `npm run test:conformance`, `npm run test:monitor` локально
 
 ## 5. Критерии приёмки
 
@@ -78,3 +78,10 @@
 
 - Тесты терминала на Windows-раннере медленнее локальных: таймауты задаются с запасом, не короче 3 с.
 - Запись в stdin после выхода процесса: `server-manager.ts` проверяет `writable` перед отправкой.
+
+## 7. Проверено в изолированной копии на Windows, 28.11.2026
+
+- Сервер, Electron main и renderer собраны. Прошли `npm run check`, полный `npm run build` и все 13 conformance-тестов с `CONFORMANCE_BROWSER=1`, включая отдельный headless-браузер. Эталон содержит 24 инструмента: повторное снятие даёт те же байты; изменение одного поля схемы в копии даёт ненулевой выход и diff.
+- 3 теста адаптера десктопа прошли. В реальном окне Electron на отдельном профиле проверены ошибка занятого порта, запуск, появление клиента в мониторе, пауза/возобновление, остановка и освобождение локального порта при выходе. Старый Node IPC проверен через `test:monitor` и `test:tunnels`; использовались имитации провайдеров, реальные туннели не открывались.
+- Проверен режим `MCP_URL`/`MCP_KEY` против отдельно запущенного временного экземпляра. В последнем прогоне 8 проверок прошли; 5, требующие запуска или управления дочерним процессом, изменения конфигурации либо нового браузера, пропущены по назначению. Клиент конечных RPC не подписывается на необязательный бесконечный `GET /mcp`; связка `/sse` + `/messages` проверяется отдельным настоящим соединением.
+- Для T6 готов workflow на push/PR, `windows-latest`, Node 24 и `contents: read`. Его структура и проверка Git-индекса проверены локально (включая отрицательный пример). Локальные тесты выполнялись на Node 22.22.2; результат GitHub Actions не заявляется до запуска на GitHub.

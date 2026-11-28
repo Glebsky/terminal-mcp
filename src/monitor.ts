@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
+import { emit, isAttached } from "./control.js";
 
 // Only authenticated MCP payload bodies are measured. Headers and network framing
 // are intentionally excluded, and neither tokens nor payload contents are retained.
@@ -141,7 +142,7 @@ function resolveClientIdentity(req: Request, body: Record<string, any>, peer: st
 }
 
 export function monitorRequest(req: Request, res: Response, next: NextFunction): void {
-  if (!process.send) { next(); return; }
+  if (!isAttached()) { next(); return; }
   const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body : {};
   const method = safeLabel(body.method, `${req.method} ${req.path}`);
   const operation = method === "tools/call" ? safeLabel(body.params?.name, method) : method;
@@ -195,7 +196,7 @@ export function setMonitoringEnabled(value: boolean): void {
 }
 
 const timer = setInterval(() => {
-  if (!enabled || !process.connected || !process.send) return;
+  if (!enabled || !isAttached()) return;
   const snapshot = {
     received, sent, totalReceived, totalSent, totalRequests,
     activeRequests: getOpenSseCount() + [...active.values()].filter(item => item.kind === "http").length,
@@ -207,6 +208,6 @@ const timer = setInterval(() => {
   };
   received = sent = 0;
   operations.clear();
-  try { process.send({ type: "monitor:snapshot", snapshot }, () => {}); } catch { /* parent disconnected */ }
+  emit({ type: "monitor:snapshot", snapshot });
 }, 1000);
 timer.unref();

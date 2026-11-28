@@ -3,6 +3,7 @@
 // to stdout as "[CTL] <json>" lines. Commands arrive over Node IPC or, with MCP_CONTROL=stdio,
 // as JSON lines on stdin. The stdio form is language-neutral, so a non-Node server can speak it too.
 import { createInterface } from "node:readline";
+import { redactValue } from "./utils/logger.js";
 
 export interface ControlMessage {
   type: string;
@@ -18,21 +19,20 @@ export function isAttached(): boolean {
 
 /** Send an event to the parent; `done` runs once every channel has flushed it. Never include secrets. */
 export function emit(event: ControlMessage, done?: () => void): void {
-  let pending = 0;
-  let finished = false;
-  const finish = () => {
-    pending -= 1;
-    if (pending <= 0 && !finished) { finished = true; done?.(); }
-  };
+  if (!isAttached()) { done?.(); return; }
+  const safe = redactValue(event) as ControlMessage;
+  // Keep one slot until both writes have been attempted, even if one throws synchronously.
+  let pending = 1;
+  const finish = () => { if (--pending === 0) done?.(); };
   if (process.connected && process.send) {
-    pending += 1;
-    try { process.send(event, () => finish()); } catch { finish(); }
+    pending++;
+    try { process.send(safe, finish); } catch { finish(); }
   }
   if (stdioMode) {
-    pending += 1;
-    try { process.stdout.write(`[CTL] ${JSON.stringify(event)}\n`, () => finish()); } catch { finish(); }
+    pending++;
+    try { process.stdout.write(`[CTL] ${JSON.stringify(safe)}\n`, finish); } catch { finish(); }
   }
-  if (pending === 0 && !finished) { finished = true; done?.(); }
+  finish();
 }
 
 /**

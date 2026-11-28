@@ -1,0 +1,664 @@
+[
+  {
+    "name": "browser_click",
+    "title": "Click element on webpage",
+    "description": "Click an HTML element matching a CSS selector in the active browser page.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "selector": {
+          "description": "CSS selector of element to click (e.g. 'button.submit', '#login', 'a[href=\"/about\"]')",
+          "minLength": 1,
+          "type": "string"
+        },
+        "timeout_ms": {
+          "default": 10000,
+          "description": "Wait timeout for element in milliseconds",
+          "exclusiveMinimum": 0,
+          "maximum": 60000,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "selector"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "browser_close",
+    "title": "Close browser",
+    "description": "Close the browser launched by this server. If attached via browser_connect, only disconnects and leaves the user's browser and tabs open.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "name": "browser_connect",
+    "title": "Connect to running browser",
+    "description": "Attach to an already running Chrome/Edge with its open tabs, cookies and logged-in sessions via the remote debugging port, instead of launching a new browser. After connecting, browser_get_content, browser_evaluate, browser_screenshot, browser_click and browser_type work on the selected tab (by default the tab the user is looking at). The browser must run with --remote-debugging-port=9222 and a non-default --user-data-dir; set launch_if_missing=true to start such a browser with a persistent profile.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "browser": {
+          "default": "chrome",
+          "description": "Browser to start when launch_if_missing=true",
+          "enum": [
+            "chrome",
+            "edge"
+          ],
+          "type": "string"
+        },
+        "endpoint": {
+          "description": "DevTools endpoint: a port (9222), http://127.0.0.1:9222 or ws://... Defaults to BROWSER_CDP_URL or http://127.0.0.1:9222",
+          "type": "string"
+        },
+        "launch_if_missing": {
+          "default": false,
+          "description": "If nothing listens on the endpoint, start Chrome/Edge with remote debugging and a persistent profile (it stays open after disconnect)",
+          "type": "boolean"
+        },
+        "timeout_ms": {
+          "default": 20000,
+          "description": "How long to wait for a started browser to accept connections",
+          "exclusiveMinimum": 0,
+          "maximum": 120000,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "browser_evaluate",
+    "title": "Execute JavaScript in browser",
+    "description": "Evaluate arbitrary JavaScript code inside the active browser webpage context. Returns the evaluated value as JSON.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "script": {
+          "description": "JavaScript code or expression to run (e.g. document.title, window.__STATE__, or an async function)",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "script"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "browser_get_content",
+    "title": "Get webpage content",
+    "description": "Extract readable text, raw HTML, or title from the active webpage or a specific selector. Long content comes in pages: while truncated is true, continue from next_offset.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "length": {
+          "description": "Maximum number of characters to return",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "First character to return (UTF-16 index); pass next_offset from the previous page",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "selector": {
+          "description": "Optional CSS selector to target a specific container element",
+          "type": "string"
+        },
+        "type": {
+          "default": "text",
+          "description": "Type of content: 'text' (rendered text), 'html' (DOM HTML), or 'title'",
+          "enum": [
+            "text",
+            "html",
+            "title"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "browser_list_tabs",
+    "title": "List browser tabs",
+    "description": "List open tabs (index, url, title, whether visible to the user and whether active for browser_* tools) in the current browser session.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "name": "browser_navigate",
+    "title": "Navigate to URL",
+    "description": "Navigate the active browser page to a new URL.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "timeout_ms": {
+          "default": 30000,
+          "description": "Navigation timeout in milliseconds",
+          "exclusiveMinimum": 0,
+          "maximum": 120000,
+          "type": "integer"
+        },
+        "url": {
+          "description": "Target URL to navigate to",
+          "minLength": 1,
+          "type": "string"
+        },
+        "wait_until": {
+          "default": "load",
+          "description": "Condition to wait for",
+          "enum": [
+            "load",
+            "domcontentloaded",
+            "networkidle0"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "browser_new_tab",
+    "title": "Open new tab",
+    "description": "Open a new tab in the current browser session (optionally navigating to a URL) and make it the active tab for browser_* tools.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "url": {
+          "description": "URL to open in the new tab",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "browser_open",
+    "title": "Open URL in browser",
+    "description": "Open a webpage in host browser (Chrome or Edge). By default launches a visible browser window (headless=false) so you can test web applications visually.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "browser": {
+          "default": "chrome",
+          "description": "Preferred browser (defaults to Google Chrome, falls back to Microsoft Edge)",
+          "enum": [
+            "chrome",
+            "edge"
+          ],
+          "type": "string"
+        },
+        "headless": {
+          "default": false,
+          "description": "If false (default), opens a real visible browser window. If true, runs headlessly.",
+          "type": "boolean"
+        },
+        "url": {
+          "description": "The URL to open (e.g. http://localhost:3000, http://127.0.0.1:8080, https://...)",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "browser_screenshot",
+    "title": "Take webpage screenshot",
+    "description": "Capture a screenshot of the active browser page. Can save to file or return base64.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "full_page": {
+          "default": false,
+          "description": "Whether to capture full scrollable page or visible viewport only",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "Optional file path to save PNG screenshot to (e.g. 'screenshots/test1.png')",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "browser_select_tab",
+    "title": "Select browser tab",
+    "description": "Choose which open tab subsequent browser_* tools operate on: by index (from browser_list_tabs), by URL or title substring, or with no arguments the tab the user is currently looking at.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "bring_to_front": {
+          "default": false,
+          "description": "Also switch the visible tab in the browser window",
+          "type": "boolean"
+        },
+        "index": {
+          "description": "Tab index from browser_list_tabs",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "title_contains": {
+          "description": "Case-insensitive substring of the tab title",
+          "minLength": 1,
+          "type": "string"
+        },
+        "url_contains": {
+          "description": "Case-insensitive substring of the tab URL",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "browser_type",
+    "title": "Type text into element",
+    "description": "Type text into an input or textarea element on the active browser page.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "clear": {
+          "default": false,
+          "description": "Whether to clear existing text before typing",
+          "type": "boolean"
+        },
+        "selector": {
+          "description": "CSS selector of input/textarea element",
+          "minLength": 1,
+          "type": "string"
+        },
+        "text": {
+          "description": "Text string to type into the element",
+          "type": "string"
+        },
+        "timeout_ms": {
+          "default": 10000,
+          "description": "Wait timeout for element in milliseconds",
+          "exclusiveMinimum": 0,
+          "maximum": 60000,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "selector",
+        "text"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "file_delete",
+    "title": "Delete a path",
+    "description": "Permanently delete a file or directory. Recursive directory deletion must be explicitly enabled.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "path": {
+          "description": "Path of file or directory to delete",
+          "minLength": 1,
+          "type": "string"
+        },
+        "recursive": {
+          "default": false,
+          "description": "Required to be true to delete non-empty directories",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "file_list",
+    "title": "List files",
+    "description": "List files and directories at a host path. When truncated is true, continue from next_offset.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "max_entries": {
+          "default": 500,
+          "description": "Maximum number of items to return",
+          "exclusiveMinimum": 0,
+          "maximum": 10000,
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Number of entries to skip; pass next_offset from the previous page",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "Directory path to list",
+          "minLength": 1,
+          "type": "string"
+        },
+        "recursive": {
+          "default": false,
+          "description": "Whether to list subdirectories recursively",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "file_mkdir",
+    "title": "Create a directory",
+    "description": "Create a directory and any missing parent directories.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "path": {
+          "description": "Path of directory to create",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "file_move",
+    "title": "Move or rename a path",
+    "description": "Move or rename a file or directory.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "destination": {
+          "description": "Destination path",
+          "minLength": 1,
+          "type": "string"
+        },
+        "overwrite": {
+          "default": false,
+          "description": "Whether to overwrite existing destination",
+          "type": "boolean"
+        },
+        "source": {
+          "description": "Source path",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "destination"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "file_read",
+    "title": "Read a file",
+    "description": "Read a text or binary file from the host filesystem. UTF-8 chunks never split a character; while truncated is true, continue from next_offset.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "encoding": {
+          "default": "utf8",
+          "description": "File content encoding",
+          "enum": [
+            "utf8",
+            "base64"
+          ],
+          "type": "string"
+        },
+        "length": {
+          "description": "Number of bytes to read (max: 10485760)",
+          "exclusiveMinimum": 0,
+          "maximum": 10485760,
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Byte offset to start reading from",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "description": "Path to the file to read",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "file_replace",
+    "title": "Replace text in file",
+    "description": "Replace an exact substring or block of code in a file without rewriting the whole file.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "allow_multiple": {
+          "default": false,
+          "description": "If true, replaces all occurrences. If false, fails if target appears more than once.",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "Path to the file",
+          "minLength": 1,
+          "type": "string"
+        },
+        "replacement": {
+          "description": "The replacement text/code chunk",
+          "type": "string"
+        },
+        "target": {
+          "description": "The exact text/code chunk to replace",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "target",
+        "replacement"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "file_search",
+    "title": "Search files",
+    "description": "Search files by name pattern (e.g. *.ts) and/or search for text/regex inside file contents. Files that could not be searched (larger than MAX_FILE_BYTES, unreadable) are listed in skipped; non-UTF-8 text is decoded with the system code page.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "case_sensitive": {
+          "default": false,
+          "description": "Whether content search is case sensitive",
+          "type": "boolean"
+        },
+        "max_results": {
+          "default": 100,
+          "description": "Maximum number of results to return",
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "type": "integer"
+        },
+        "path": {
+          "description": "Base directory to search in",
+          "minLength": 1,
+          "type": "string"
+        },
+        "pattern": {
+          "description": "Filename glob pattern (e.g. *.ts, *config*, *.json)",
+          "type": "string"
+        },
+        "query": {
+          "description": "Text or regex to search inside file contents",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "file_stat",
+    "title": "Inspect a path",
+    "description": "Return metadata for a file or directory.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "path": {
+          "description": "Path to inspect",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "file_write",
+    "title": "Write a file",
+    "description": "Create, overwrite, or append to a file. Parent directories are created automatically.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "append": {
+          "default": false,
+          "description": "If true, appends data to the end of the file",
+          "type": "boolean"
+        },
+        "data": {
+          "description": "Content to write into the file",
+          "type": "string"
+        },
+        "encoding": {
+          "default": "utf8",
+          "description": "Encoding of input data",
+          "enum": [
+            "utf8",
+            "base64"
+          ],
+          "type": "string"
+        },
+        "path": {
+          "description": "Path to the file to write",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "data"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "terminal_execute",
+    "title": "Execute a terminal command",
+    "description": "Execute a PowerShell or cmd command on the host. This has unrestricted host privileges when FULL_ACCESS=true. Output over MAX_OUTPUT_BYTES is cut at a character boundary (truncated: true); redirect long output to a file and read it with file_read.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "command": {
+          "description": "The command to execute",
+          "minLength": 1,
+          "type": "string"
+        },
+        "cwd": {
+          "description": "Working directory for command execution",
+          "type": "string"
+        },
+        "shell": {
+          "default": "powershell",
+          "description": "Shell type to execute command in",
+          "enum": [
+            "powershell",
+            "cmd"
+          ],
+          "type": "string"
+        },
+        "timeout_ms": {
+          "description": "Command timeout in milliseconds (default: COMMAND_TIMEOUT_MS, max: 900000)",
+          "exclusiveMinimum": 0,
+          "maximum": 900000,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "workspace_get_cwd",
+    "title": "Get current working directory",
+    "description": "Get the current active working directory and files root.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "name": "workspace_set_cwd",
+    "title": "Set current working directory",
+    "description": "Change the active working directory for subsequent file operations and terminal commands (e.g. 'sandustry'). Allows using short relative paths within that project.",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "path": {
+          "description": "Subdirectory name or path to set as current working directory",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    }
+  }
+]

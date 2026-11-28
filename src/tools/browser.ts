@@ -292,7 +292,7 @@ export class BrowserManager {
   /**
    * Ensure an active page is available and set up listeners.
    */
-  private async ensurePage(headless = false, preferred: "chrome" | "edge" = "chrome"): Promise<Page> {
+  private async ensurePage(headless = this.isHeadless, preferred: "chrome" | "edge" = "chrome"): Promise<Page> {
     const browser = await this.ensureBrowser(headless, preferred);
 
     if (this.activePage && !this.activePage.isClosed()) {
